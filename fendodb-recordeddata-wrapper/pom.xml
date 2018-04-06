@@ -6,7 +6,7 @@
     <parent>
 		<groupId>org.smartrplace.logging</groupId>
 	    <artifactId>fendodb-base</artifactId>
-	    <version>0.0.1-SNAPSHOT</version>
+	    <version>0.0.1</version>
     </parent>
 
 	<artifactId>fendodb-recordeddata-wrapper</artifactId>
