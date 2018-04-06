@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+	<modelVersion>4.0.0</modelVersion>
+
+    <parent>
+		<groupId>org.smartrplace.logging</groupId>
+	    <artifactId>fendodb-base</artifactId>
+	    <version>0.0.1-SNAPSHOT</version>
+    </parent>
+
+	<artifactId>fendodb-core</artifactId>
+	<name>FendoDB time series database</name>
+
+	<packaging>bundle</packaging>
+
+	<dependencies>
+		<dependency>
+			<groupId>org.osgi</groupId>
+			<artifactId>org.osgi.core</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.osgi</groupId>
+			<artifactId>org.osgi.compendium</artifactId>
+		</dependency>
+		<dependency>
+            <groupId>org.apache.felix</groupId>
+            <artifactId>org.apache.felix.scr.annotations</artifactId>
+        </dependency>
+		<dependency>
+			<groupId>org.smartrplace.logging</groupId>
+			<artifactId>fendodb-api</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>com.google.guava</groupId>
+			<artifactId>guava</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.apache.felix</groupId>
+			<artifactId>org.apache.felix.gogo.runtime</artifactId>
+			<version>1.0.6</version>
+		</dependency>
+		<dependency>
+			<groupId>commons-io</groupId>
+			<artifactId>commons-io</artifactId>
+			<version>2.6</version>
+		</dependency>
+		<dependency>
+			<groupId>junit</groupId>
+			<artifactId>junit</artifactId>
+			<version>4.12</version>
+			<scope>test</scope>
+		</dependency>
+	</dependencies>
+
+	<build>
+		<plugins>
+			<plugin>
+            	<groupId>org.apache.felix</groupId>
+                <artifactId>maven-scr-plugin</artifactId>
+			</plugin>
+			<plugin>
+                <groupId>org.apache.felix</groupId>
+                <artifactId>maven-bundle-plugin</artifactId>
+                 <configuration>
+                    <instructions>
+                    	<!-- exporting the API packages from another jar means they will be included in this bundle -->
+                    	<Export-Package>
+                    		org.smartrplace.logging.fendodb,
+                    		org.smartrplace.logging.fendodb.search,
+                    		org.smartrplace.logging.fendodb.permissions,
+                    		org.smartrplace.logging.fendodb.stats,
+                    		org.smartrplace.logging.fendodb.stats.samples
+                    	</Export-Package>
+                        <Import-Package>
+                        	org.apache.felix.service.command;resolution:=optional;version="[${felix.service.command.version.min},${felix.service.command.version.max})",
+                            com.google.common.cache;version="[${guava.version.min},${guava.version.max})",
+                        *</Import-Package>
+                    </instructions>
+                </configuration>
+            </plugin>
+		</plugins>
+	</build>
+</project>

@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+	<modelVersion>4.0.0</modelVersion>
+
+    <parent>
+		<groupId>org.smartrplace.logging</groupId>
+	    <artifactId>fendodb-base</artifactId>
+	    <version>0.0.1-SNAPSHOT</version>
+    </parent>
+
+	<artifactId>fendodb-recordeddata-wrapper</artifactId>
+	<name>Wrapper for using fendoDB as logger for OGEMA data</name>
+
+	<packaging>bundle</packaging>
+
+	<dependencies>
+		<dependency>
+			<groupId>org.osgi</groupId>
+			<artifactId>org.osgi.core</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.osgi</groupId>
+			<artifactId>org.osgi.compendium</artifactId>
+		</dependency>
+		<dependency>
+            <groupId>org.apache.felix</groupId>
+            <artifactId>org.apache.felix.scr.annotations</artifactId>
+        </dependency>
+        <dependency>
+			<groupId>org.ogema.ref-impl</groupId>
+			<artifactId>internal-api</artifactId>
+			<version>${ogema.api.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>org.smartrplace.logging</groupId>
+			<artifactId>fendodb-api</artifactId>
+		</dependency>
+	</dependencies>
+
+	<build>
+		<plugins>
+			<plugin>
+            	<groupId>org.apache.felix</groupId>
+                <artifactId>maven-scr-plugin</artifactId>
+			</plugin>
+			<plugin>
+                <groupId>org.apache.felix</groupId>
+                <artifactId>maven-bundle-plugin</artifactId>
+            </plugin>
+		</plugins>
+	</build>
+</project>

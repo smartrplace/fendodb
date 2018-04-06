@@ -1,0 +1,342 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+	<modelVersion>4.0.0</modelVersion>
+
+	<groupId>org.smartrplace.logging</groupId>
+	<artifactId>fendodb-base</artifactId>
+	<version>0.0.1-SNAPSHOT</version>
+	<name>FendoDB timeseries database</name>
+	<description>FendoDB is a timeseries database targeted at IoT device log data, used in particular with OGEMA</description>
+	<packaging>pom</packaging>
+	<url>http://smartrplace.de</url>
+
+	<inceptionYear>2017</inceptionYear>
+	<licenses>
+		<license>
+			<name>The GNU General Public License, Version 3.0</name>
+			<url>http://www.gnu.org/licenses/gpl-3.0.txt</url>
+			<distribution>manual</distribution>
+		</license>
+	</licenses>
+
+	<scm>
+		<connection>scm:git:git://github.com/smartrplace/fendodb.git</connection>
+		<developerConnection>scm:git:git://github.com/smartrplace/fendodb.git</developerConnection>
+		<url>https://github.com/smartrplace/fendodb</url>
+		<tag>HEAD</tag>
+	</scm>
+
+	<!-- TODO remove once all dependencies are available from Maven central -->
+	<repositories>
+		<repository>
+			<releases />
+			<snapshots>
+				<enabled>false</enabled>
+			</snapshots>
+			<id>ogema-releases</id>
+			<name>ogema-releases</name>
+			<url>https://www.ogema-source.net/artifactory/libs-release</url>
+		</repository>
+	</repositories>
+
+	<properties>
+		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+		<osgi.version>5.0.0</osgi.version>
+		<ogema.api.version>2.1.3</ogema.api.version>
+		<ogema.widgets.version>2.1.3</ogema.widgets.version>
+		<slf4j.version>1.7.2</slf4j.version>
+		<!-- max versions exclusive -->
+		<guava.version.min>19.0</guava.version.min>
+		<guava.version.max>25.0</guava.version.max>
+		<felix.service.command.version.min>0.0.0</felix.service.command.version.min>
+		<felix.service.command.version.max>2.0.0</felix.service.command.version.max>
+	</properties>
+
+	<modules>
+		<module>fendodb-api</module>
+		<module>fendodb-core</module>
+		<module>fendodb-ogema-admin</module>
+		<module>fendodb-ogema-tagging</module>
+		<module>fendodb-recordeddata-wrapper</module>
+		<module>fendodb-rest</module>
+		<module>fendodb-tools</module>
+		<module>fendodb-viz</module>
+	</modules>
+
+	<build>
+		<plugins>
+			<plugin>
+				<groupId>org.apache.felix</groupId>
+				<artifactId>maven-bundle-plugin</artifactId>
+			</plugin>
+		</plugins>
+		<pluginManagement>
+			<plugins>
+				<!-- execution order: run scr before manifest and manifest before tests,
+					so that pax exam can use the manifest -->
+				<plugin>
+					<groupId>org.apache.felix</groupId>
+					<artifactId>maven-scr-plugin</artifactId>
+					<version>1.24.0</version>
+					<configuration>
+						<outputDirectory>${project.build.outputDirectory}</outputDirectory>
+					</configuration>
+					<executions>
+						<execution>
+							<id>generate-scr-scrdescriptor</id>
+							<phase>process-classes</phase>
+							<goals>
+								<goal>scr</goal>
+							</goals>
+						</execution>
+					</executions>
+				</plugin>
+				<plugin>
+					<groupId>org.apache.felix</groupId>
+					<artifactId>maven-bundle-plugin</artifactId>
+					<extensions>true</extensions>
+					<version>3.3.0</version>
+					<executions>
+						<execution>
+							<id>bundle-manifest</id>
+							<phase>generate-test-sources</phase>
+							<goals>
+								<goal>manifest</goal>
+							</goals>
+						</execution>
+					</executions>
+				</plugin>
+				<plugin>
+					<groupId>org.apache.maven.plugins</groupId>
+					<artifactId>maven-compiler-plugin</artifactId>
+					<configuration>
+						<source>1.8</source>
+						<target>1.8</target>
+						<showDeprecation>true</showDeprecation>
+						<showWarnings>true</showWarnings>
+						<compilerArgs>
+							<arg>-Xlint</arg>
+						</compilerArgs>
+					</configuration>
+				</plugin>
+				<plugin>
+					<groupId>com.googlecode.maven-java-formatter-plugin</groupId>
+					<artifactId>maven-java-formatter-plugin</artifactId>
+					<version>0.4</version>
+					<configuration>
+						<configFile>${format.file}</configFile>
+						<encoding>UTF-8</encoding>
+						<lineEnding>LF</lineEnding>
+						<excludes>
+							<exclude>**/src/test/**</exclude>
+						</excludes>
+					</configuration>
+					<executions>
+						<execution>
+							<goals>
+								<goal>format</goal>
+							</goals>
+							<phase>validate</phase>
+						</execution>
+					</executions>
+				</plugin>
+
+				<!-- Plugin for automatic addition of header to java, html, jsp, .. files. -->
+				<plugin>
+					<groupId>com.mycila</groupId>
+					<artifactId>license-maven-plugin</artifactId>
+					<version>3.0</version>
+					<configuration>
+						<!-- see 'mvn com.mycila:license-maven-plugin:help -Ddetail=true' -->
+						<header>header.txt</header>
+						<keywords> <!-- existing license headers contain all of these keywords -->
+							<keyword>Smartrplace</keyword>
+							<keyword>GNU</keyword>
+							<keyword>License</keyword>
+						</keywords>
+						<properties>
+							<year>2018</year>
+							<email>info@smartrplace.de</email>
+						</properties>
+						<encoding>UTF-8</encoding>
+
+						<includes>
+							<include>src/**</include>
+							<include>web/**</include>
+						</includes>
+						<excludes>
+							<exclude>target/**</exclude>
+							<exclude>**/*.txt</exclude>
+							<exclude>**/data/**</exclude>
+							<exclude>**/MANIFEST.MF</exclude>
+							<exclude>**/.project</exclude>
+							<exclude>**/.settings</exclude>
+							<exclude>**/.classpath</exclude>
+						</excludes>
+						<useDefaultExcludes>true</useDefaultExcludes>
+						<strictCheck>true</strictCheck>
+						<failIfMissing>true</failIfMissing>
+					</configuration>
+					<executions>
+						<execution>
+							<goals>
+								<goal>format</goal>
+							</goals>
+							<!-- don't execute this plugin automatically -> need to be invoked
+								explicitly: mvn license:[goal] [goal] := check, format or remove -->
+							<phase>validate</phase>
+						</execution>
+					</executions>
+				</plugin>
+
+				<!-- Source Plugin -->
+				<plugin>
+					<groupId>org.apache.maven.plugins</groupId>
+					<artifactId>maven-source-plugin</artifactId>
+					<version>${maven-source-plugin.version}</version>
+					<executions>
+						<execution>
+							<id>attach-sources</id>
+							<goals>
+								<goal>jar-no-fork</goal>
+							</goals>
+						</execution>
+					</executions>
+				</plugin>
+
+				<!-- Javadoc Plugin -->
+				<plugin>
+					<groupId>org.apache.maven.plugins</groupId>
+					<artifactId>maven-javadoc-plugin</artifactId>
+					<version>${maven-javadoc-plugin.version}</version>
+					<executions>
+						<execution>
+							<id>attach-javadocs</id>
+							<goals>
+								<goal>jar</goal>
+							</goals>
+						</execution>
+					</executions>
+				</plugin>
+
+				<plugin>
+					<groupId>org.apache.maven.plugins</groupId>
+					<artifactId>maven-surefire-plugin</artifactId>
+					<version>2.19.1</version>
+					<configuration>
+						<argLine>-ea</argLine>
+					</configuration>
+				</plugin>
+				<!-- Release Plugin -->
+				<!-- Usage: 1. mvn release:prepare -Prelease-prepare 2. mvn release:perform
+					-Dgoals'deploy -f src/pom.xml' NOTE: unfortunately the attribute pomFileName
+					is ignored in mvn 3.0.5 and/or release-plugin version 2.5.1 so using profile
+					-Prelease-perform isn't working yet ... alternatively (with dryRun): mvn
+					release:prepare -Prelease-prepare -DdryRun=true mvn release:clean -->
+				<plugin>
+					<groupId>org.apache.maven.plugins</groupId>
+					<artifactId>maven-release-plugin</artifactId>
+					<version>2.5.3</version>
+				</plugin>
+			</plugins>
+		</pluginManagement>
+	</build>
+
+	<dependencyManagement>
+		<dependencies>
+			<!-- OSGi -->
+			<dependency>
+				<groupId>org.osgi</groupId>
+				<artifactId>org.osgi.core</artifactId>
+				<version>${osgi.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.osgi</groupId>
+				<artifactId>org.osgi.compendium</artifactId>
+				<version>${osgi.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.apache.felix</groupId>
+				<artifactId>org.apache.felix.scr.annotations</artifactId>
+				<version>1.9.12</version>
+			</dependency>
+
+			<!-- Logging -->
+			<dependency>
+				<groupId>org.slf4j</groupId>
+				<artifactId>slf4j-api</artifactId>
+				<version>${slf4j.version}</version>
+			</dependency>
+
+			<!-- OGEMA API -->
+			<dependency>
+				<groupId>org.ogema.core</groupId>
+				<artifactId>api</artifactId>
+				<version>${ogema.api.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.ogema.core</groupId>
+				<artifactId>models</artifactId>
+				<version>${ogema.api.version}</version>
+			</dependency>
+			<!-- OGEMA Tools and Services -->
+			<dependency>
+				<groupId>org.ogema.tools</groupId>
+				<artifactId>resource-utils</artifactId>
+				<version>${ogema.api.version}</version>
+			</dependency>
+
+			<!-- OGEMA widget framework -->
+			<dependency>
+				<groupId>de.iwes.widgets</groupId>
+				<artifactId>ogema-gui-api</artifactId>
+				<version>${ogema.widgets.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>de.iwes.widgets</groupId>
+				<artifactId>ogema-js-bundle</artifactId>
+				<version>${ogema.widgets.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>de.iwes.widgets</groupId>
+				<artifactId>widget-collection</artifactId>
+				<version>${ogema.widgets.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>de.iwes.widgets</groupId>
+				<artifactId>widget-extended</artifactId>
+				<version>${ogema.widgets.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>de.iwes.widgets</groupId>
+				<artifactId>widget-experimental</artifactId>
+				<version>${ogema.widgets.version}</version>
+			</dependency>
+
+			<!-- Others -->
+			<dependency>
+				<groupId>javax.servlet</groupId>
+				<artifactId>javax.servlet-api</artifactId>
+				<version>3.1.0</version>
+			</dependency>
+			<dependency>
+				<groupId>com.google.guava</groupId>
+				<artifactId>guava</artifactId>
+				<version>23.0</version>
+			</dependency>
+
+			<dependency>
+				<groupId>org.smartrplace.logging</groupId>
+				<artifactId>fendodb-api</artifactId>
+				<version>0.0.1-SNAPSHOT</version>
+			</dependency>
+			<dependency>
+				<groupId>org.smartrplace.logging</groupId>
+				<artifactId>fendodb-tools</artifactId>
+				<version>0.0.1-SNAPSHOT</version>
+			</dependency>
+		</dependencies>
+	</dependencyManagement>
+
+</project>
