@@ -5,7 +5,7 @@
 
 	<groupId>org.smartrplace.logging</groupId>
 	<artifactId>fendodb-base</artifactId>
-	<version>0.0.1</version>
+	<version>0.0.2-SNAPSHOT</version>
 	<name>FendoDB timeseries database</name>
 	<description>FendoDB is a timeseries database targeted at IoT device log data, used in particular with OGEMA</description>
 	<packaging>pom</packaging>
@@ -46,6 +46,7 @@
 		<ogema.api.version>2.1.3</ogema.api.version>
 		<ogema.widgets.version>2.1.3</ogema.widgets.version>
 		<slf4j.version>1.7.2</slf4j.version>
+		<maven-source-plugin.version>3.0.1</maven-source-plugin.version>
 		<!-- max versions exclusive -->
 		<guava.version.min>19.0</guava.version.min>
 		<guava.version.max>25.0</guava.version.max>
@@ -329,12 +330,12 @@
 			<dependency>
 				<groupId>org.smartrplace.logging</groupId>
 				<artifactId>fendodb-api</artifactId>
-				<version>0.0.1</version>
+				<version>0.0.2-SNAPSHOT</version>
 			</dependency>
 			<dependency>
 				<groupId>org.smartrplace.logging</groupId>
 				<artifactId>fendodb-tools</artifactId>
-				<version>0.0.1</version>
+				<version>0.0.2-SNAPSHOT</version>
 			</dependency>
 		</dependencies>
 	</dependencyManagement>
