@@ -22,6 +22,8 @@ Download the run configuration [rundir-ogema-felix](https://github.com/smartrpla
 
 Use the [REST interface](https://github.com/smartrplace/fendodb/wiki/REST-API) or the [shell commands](https://github.com/smartrplace/fendodb/wiki/Shell-commands) to create a database instance and to add data points, or open the visualization page at https://localhost:8443/org/smartrplace/slotsdb/visualisation/index.html in the Browser.
 
+See the [Wiki](https://github.com/smartrplace/fendodb/wiki) for more information.
+
 ---
 ## API reference
 There is a [Java API](https://github.com/smartrplace/fendodb/wiki/Java-API) and a [REST interface](https://github.com/smartrplace/fendodb/wiki/REST-API), and in addition a set of [shell commands](https://github.com/smartrplace/fendodb/wiki/Shell-commands) for the Gogo OSGi shell.
