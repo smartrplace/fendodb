@@ -22,6 +22,9 @@ import java.util.List;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
+import org.ogema.core.channelmanager.measurements.FloatValue;
+import org.ogema.core.channelmanager.measurements.Quality;
+import org.ogema.core.channelmanager.measurements.SampledValue;
 import org.ogema.core.recordeddata.RecordedDataConfiguration;
 import org.ogema.core.recordeddata.RecordedDataConfiguration.StorageType;
 import org.ogema.recordeddata.DataRecorderException;
@@ -50,6 +53,7 @@ public class PersistentConfigurationTest extends DbTest {
 		conf2.setFixedInterval(INTERVAL_2);
 		conf2.setStorageType(StorageType.FIXED_INTERVAL);
 		RecordedDataStorage rds2 = sdb.createRecordedDataStorage(TEST_ID_2, conf2);
+
 	}
 
 	/**

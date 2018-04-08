@@ -57,9 +57,9 @@ import org.ogema.model.targetranges.TargetRange;
 import org.smartrplace.logging.fendodb.CloseableDataRecorder;
 
 public class TaggingUtils {
-	
+
 	// A set of often-used device types
-	
+
 	@SuppressWarnings("unchecked")
 	private static final Class<? extends PhysicalElement>[] SPECIFIC_DEVICE_TYPES = new Class[] {
 		 Thermostat.class,
@@ -85,7 +85,7 @@ public class TaggingUtils {
 		 ElectricLight.class,
 		 GenericMeter.class
 	};
-	
+
 	@SuppressWarnings("unchecked")
 	private static final Class<? extends PhysicalElement>[] HEATING_TYPES = new Class[] {
 			 Thermostat.class,
@@ -99,7 +99,7 @@ public class TaggingUtils {
 			 HeatMeter.class,
 			 DoorWindowSensor.class
 		};
-	
+
 	@SuppressWarnings("unchecked")
 	private static final Class<? extends PhysicalElement>[] ELECTRICITY_TYPES = new Class[] {
 			 PowerSensor.class,
@@ -134,9 +134,9 @@ public class TaggingUtils {
 		});
 		return true;
 	}
-		
+
 	/**
-	 * Returns a map of standard tags for this resource, with keys defined by the 
+	 * Returns a map of standard tags for this resource, with keys defined by the
 	 * constants in {@link LogDataTaggingConstants}.
 	 * @param resource
 	 * @return
@@ -156,11 +156,11 @@ public class TaggingUtils {
 		}
 		return result;
 	}
-	
+
 	/**
 	 * Like {@link #getResourceTags(Resource)}, except that we cannot access the resource
 	 * (e.g. because it is defined on another gateway), and we can only try to deduce the
-	 * type from the path. Hence, this is less exact than {@link #getResourceTags(Resource)}, 
+	 * type from the path. Hence, this is less exact than {@link #getResourceTags(Resource)},
 	 * and the latter method should be preferred, where possible.
 	 * @param path
 	 * @return
@@ -185,7 +185,7 @@ public class TaggingUtils {
 		}
 		return result;
 	}
-	
+
 	private final static void checkForDataType(final Resource p, final Map<String, List<String>> result) {
 		if (result.containsKey(LogDataTaggingConstants.DATA_TYPE))
 			return;
@@ -204,7 +204,7 @@ public class TaggingUtils {
 			return;
 		}
 	}
-	
+
 	private final static void checkForDataType(final String resNameLower, final Map<String, List<String>> result) {
 		if (result.containsKey(LogDataTaggingConstants.DATA_TYPE))
 			return;
@@ -220,7 +220,7 @@ public class TaggingUtils {
 			return;
 		}
 	}
-	
+
 	private final static void checkForApplicationDomain(final Resource p, final Map<String, List<String>> result) {
 		if (result.containsKey(LogDataTaggingConstants.APPLICATION_DOMAIN))
 			return;
@@ -236,13 +236,13 @@ public class TaggingUtils {
 			.ifPresent(type -> addProperty(result, LogDataTaggingConstants.APPLICATION_DOMAIN, "Electricity"));
 		// TODO further types
 	}
-	
+
 	private final static void checkForDeviceTypeSpecific(final Resource p, final Map<String, List<String>> result) {
 		if (!(p instanceof PhysicalElement))
 			return;
 		appendSuperInterfaces(p.getResourceType(), result);
 	}
-	
+
 	private final static void appendSuperInterfaces(final Class<?> itf, final Map<String, List<String>> result) {
 		if (itf == PhysicalElement.class || itf == Sensor.class || itf == Actor.class || itf == Resource.class || !Resource.class.isAssignableFrom(itf))
 			return;
@@ -251,7 +251,7 @@ public class TaggingUtils {
 			appendSuperInterfaces(superItf, result);
 		}
 	}
-	
+
 	private final static void checkForDeviceTypeGeneric(final Resource p, final Map<String, List<String>> result) {
 		if (result.containsKey(LogDataTaggingConstants.DEVICE_TYPE_GENERIC))
 			return;
@@ -260,10 +260,10 @@ public class TaggingUtils {
 		else if (p instanceof Actor)
 			addProperty(result, LogDataTaggingConstants.DEVICE_TYPE_GENERIC, Actor.class.getSimpleName());
 	}
-	
+
 	private final static void checkForRoom(final Resource p, final Map<String, List<String>> result) {
 		Room room = null;
-		if (p instanceof Room) { 
+		if (p instanceof Room) {
 			room = (Room) p;
 		}
 		else if (p instanceof PhysicalElement && (!(p instanceof Building))) {
@@ -271,7 +271,7 @@ public class TaggingUtils {
 				room = ((PhysicalElement) p).location().room();
 			}
 		}
-		if (room != null) { 
+		if (room != null) {
 			addProperty(result, LogDataTaggingConstants.ROOM_PATH, room.getLocation());
 			if (room.name().isActive())
 				addProperty(result, LogDataTaggingConstants.ROOM_NAME, room.name().getValue());
@@ -279,7 +279,7 @@ public class TaggingUtils {
 				addProperty(result, LogDataTaggingConstants.ROOM_TYPE, room.type().getValue() + "");
 		}
 	}
-	
+
 	private final static void checkForBuilding(final Resource p, final Map<String, List<String>> result) {
 		if (result.containsKey(LogDataTaggingConstants.BUILDING_PATH))
 			return;
@@ -296,7 +296,7 @@ public class TaggingUtils {
 				addProperty(result, LogDataTaggingConstants.BUILDING_NAME, building.name().getValue());
 		}
 	}
-	
+
 	private static void addProperty(final Map<String,List<String>> result, final String key, final String value) {
 		final List<String> list0 = result.get(key);
 		if (list0 == null) {
@@ -308,5 +308,5 @@ public class TaggingUtils {
 				list0.add(value);
 		}
 	}
-	
+
 }

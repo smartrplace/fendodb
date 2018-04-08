@@ -1,0 +1,23 @@
+This is a standalone tool to read data from a fendodb/slotsdb database, generated e.g. by logging an OGEMA resource value.
+
+Run:
+java -jar FendoDbReader-0.0.1.jar <database path> <targetPath>
+
+For instance, the database path could be the "data/slotsdb" subfolder of an OGEMA rundir. The paths can be specified relative to 
+the current working directory, or absolute.
+
+Optional arguments:
+
+	-c, --copy		Copy the database, instead of creating a database CSV dump
+	-w, --writable		Only relevant in conjunction with the "-c" or "--copy" option: create a writable copy (default: false)
+
+	-i <LONG> 		sample to a periodic timeseries with interval <LONG> (in milliseconds)
+	-s <LONG or DATE>	start time: specify either the time in milliseconds since epoch, or a date string
+							in the format "yyy-MM-dd'T'HH:mm:ss:SSS" (everything starting at months is optional,
+							hence for example "2017" or "2017-11-01T15:30" are both valid inputs).
+	-e <LONG or DATE>	end time: see start time
+	-f, --format		Specify the output format: "CSV" (default), "JSON" or "XML" - Note: JSON and XML are not implemented yet... it always produces CSV results
+	-z, --zip		Zip the db dump
+	
+
+

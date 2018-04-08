@@ -45,6 +45,10 @@ From 'json.org' (http://json.org)
   - org.json (http://json.org) org.json:json:jar:20170516
   	License: see http://json.org/license.html
 
-From 'Google' (http://google.
+From 'Google' (http://google.com)
   - Guava (https://github.com/google/guava/) com.google.guava:guava:jar:23.0
     License: The Apache Software License, Version 2.0  (http://www.apache.org/licenses/LICENSE-2.0.txt)
+
+From 'Oracle' (https://www.oracle.com)
+  - Servlet API (https://javaee.github.io/servlet-spec/) javax.servlet:javax.servlet-api:jar:2.4
+    License: either CDDL (https://oss.oracle.com/licenses/CDDL) or GPL v2.0 (https://www.gnu.org/licenses/old-licenses/gpl-2.0.en.html)

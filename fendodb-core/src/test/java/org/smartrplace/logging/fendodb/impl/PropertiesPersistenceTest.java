@@ -34,7 +34,7 @@ import org.smartrplace.logging.fendodb.search.SearchFilterBuilder;
 import org.smartrplace.logging.fendodb.search.TimeSeriesMatcher;
 
 public class PropertiesPersistenceTest extends FactoryTest {
-	
+
 	@Test
 	public void tagsPersistenceWorks() throws Exception {
 		final FendoDbConfiguration config = FendoDbConfigurationBuilder.getInstance()
@@ -77,7 +77,7 @@ public class PropertiesPersistenceTest extends FactoryTest {
 			Assert.assertEquals("Search by tags returned too many results",1, list2.size());
 		}
 	}
-	
+
 	@Test
 	public void copyingPropertiesWorks() throws Exception {
 		final FendoDbConfiguration config = FendoDbConfigurationBuilder.getInstance()
@@ -124,5 +124,5 @@ public class PropertiesPersistenceTest extends FactoryTest {
 			FileUtils.deleteDirectory(path2.toFile());
 		}
 	}
-	
+
 }

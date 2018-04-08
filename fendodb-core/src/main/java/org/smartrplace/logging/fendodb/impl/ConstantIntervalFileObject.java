@@ -18,6 +18,7 @@ package org.smartrplace.logging.fendodb.impl;
 import java.io.DataInputStream;
 import java.io.File;
 import java.io.IOException;
+import java.nio.Buffer;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -112,7 +113,7 @@ public class ConstantIntervalFileObject extends FileObject {
 
 	/**
 	 * calculates the position in a file for a certain timestamp
-	 * 
+	 *
 	 * @param timestamp
 	 * @return position
 	 */
@@ -175,10 +176,10 @@ public class ConstantIntervalFileObject extends FileObject {
 
 	/**
 	 * Returns a List of Value Objects containing the measured Values between provided start and end timestamp
-	 * 
+	 *
 	 * @param start
 	 * @param end
-	 * @return 
+	 * @return
 	 * @throws IOException
 	 */
 	@Override
@@ -212,7 +213,9 @@ public class ConstantIntervalFileObject extends FileObject {
 			byte[] b = new byte[(int) (endPos - startPos) + 9];
 			dis.read(b, 0, b.length);
 			ByteBuffer bb = ByteBuffer.wrap(b);
-			bb.rewind();
+			// casting is a hack to avoid incompatibility when building this on Java 9 and run on Java 8
+			// ByteBuffer#rewind used to return a Buffer in Jdk8, but from Java 9 on returns a ByteBuffer
+			((Buffer) bb).rewind();
 
 			for (int i = 0; i <= (endPos - startPos) / 9; i++) {
 				double d = bb.getDouble();
@@ -260,14 +263,14 @@ public class ConstantIntervalFileObject extends FileObject {
 		}
 		return null;
 	}
-	
+
 	@Override
 	public SampledValue readPreviousValue(long timestamp) throws IOException {
 		// Calculate next Value, round Timestamp to next Value
 		timestamp = timestamp + (storagePeriod - ((timestamp - startTimeStamp) % storagePeriod)); // what if storagePeriod changes?
 		long startPos = getBytePosition(startTimeStamp);
 		long endPos = getBytePosition(timestamp);
-		
+
 		for (int i = 0; i <= (endPos - startPos) / 9; i++) {
 			if (timestamp >= startTimeStamp && timestamp <= getTimestampForLatestValueInternal()) {
 				if (!canRead) {
@@ -283,12 +286,12 @@ public class ConstantIntervalFileObject extends FileObject {
 		}
 		return null;
 	}
-	
+
     @Override
     public int getDataSetCount() {
     	return (int) ((length - 16) / 9);
     }
-    
+
 	@Override
 	public int getDataSetCount(long start, long end) {
 		long fileEnd = getTimestampForLatestValueInternal();
@@ -300,29 +303,29 @@ public class ConstantIntervalFileObject extends FileObject {
 		long endPos = length;
 		if (start > startTimeStamp)
 			startPos = getBytePosition(start);
-		if (end < fileEnd) 
+		if (end < fileEnd)
 			endPos = getBytePosition(end);
     	return (int) (endPos - startPos)/ 9;
-    	
+
     }
-	
+
 	/*
 	 * Methods not required; internal methods not requiring file access
 	 */
-	
+
 	@Override
 	protected int getDataSetCountInternal() {
 		return getDataSetCount();
 	}
-	
+
 	@Override
 	protected int getDataSetCountInternal(long start, long end) throws IOException {
 		return getDataSetCount();
 	}
-	
+
 	@Override
 	protected long getTimestampForLatestValueInternal() {
 		return getTimestampForLatestValue();
 	}
-	
+
 }

@@ -6,11 +6,12 @@
     <parent>
 		<groupId>org.smartrplace.logging</groupId>
 	    <artifactId>fendodb-base</artifactId>
-	    <version>0.0.2-SNAPSHOT</version>
+	    <version>0.0.2</version>
     </parent>
 
 	<artifactId>fendodb-viz</artifactId>
-	<name>FendoDB vizualisation, based on OGEMA widgets</name>
+	<name>FendoDB vizualisation</name>
+	<description>FendoDB vizualisation, based on OGEMA widgets</description>
 
 	<packaging>bundle</packaging>
 

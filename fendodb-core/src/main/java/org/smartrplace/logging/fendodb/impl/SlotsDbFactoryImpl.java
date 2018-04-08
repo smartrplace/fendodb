@@ -92,7 +92,7 @@ public class SlotsDbFactoryImpl implements FendoDbFactory {
 	// ctx is null in tests... must be able to deal with this case
 	@SuppressWarnings("unchecked")
 	@Activate
-	protected void activate(final BundleContext ctx) {
+	public void activate(final BundleContext ctx) {
 		isSecure = System.getSecurityManager() != null;
 		final Hashtable<String, Object> props = new Hashtable<String, Object>();
 		props.put("osgi.command.scope", "fendodb");
@@ -122,7 +122,7 @@ public class SlotsDbFactoryImpl implements FendoDbFactory {
 		try {
 			this.shellCommands = ctx.registerService(org.smartrplace.logging.fendodb.impl.GogoCommands.class,
 					new GogoCommands(this), props);
-			// gogo shell is an optional dependency // null in tests
+			// gogo shell is an optional dependency // null in tests or if used without OSGi
 		} catch (NoClassDefFoundError | NullPointerException expected) {
 		}
 		closed.set(false);
@@ -172,7 +172,7 @@ public class SlotsDbFactoryImpl implements FendoDbFactory {
 	}
 
 	@Deactivate
-	protected void deactivate() {
+	public void deactivate() {
 		closed.set(true);
 		final ServiceRegistration<?> sreg  = shellCommands;
 		this.shellCommands = null;
