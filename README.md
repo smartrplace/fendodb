@@ -8,6 +8,7 @@ FendoDB is a fork of the OGEMA timeseries database ([SlotsDB](https://github.com
 * tagging time series / adding semantic information
 * a full-fledged REST interface
 * administrative shell commands
+* query statistics about individual time series and groups of time series
 * a visualization tool
 * supports Java permissions
 * besides the default one-file-per-day mode, other base intervals can be configured, such as hours, weeks or months
