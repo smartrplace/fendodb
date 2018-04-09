@@ -65,8 +65,10 @@ class FendoDbReference implements DataRecorderReference {
 			if (cfgReadOnly && configuration != null && !configuration.isReadOnlyMode())
 				throw new AccessControlException("Write access to database not permitted");
 		}
-		checkState();
-		return master.getProxyDb(cfgReadOnly);
+		final SlotsDb master = checkState();
+		// may be null if database configuration is currently being updated; but this should not happen
+		// during normal operation
+		return master == null ? null : master.getProxyDb(cfgReadOnly);
 	}
 
 	SlotsDb getMaster() {
@@ -78,9 +80,18 @@ class FendoDbReference implements DataRecorderReference {
 		return "FendoDbReference for [" + master.toString() + "]";
 	}
 
-	private synchronized void checkState() throws IOException {
-		if (!master.isActive())
-			master = master.getFactory().getExistingInstanceInternal(master.getPath());
+	private SlotsDb checkState() throws IOException {
+		final SlotsDb initial = this.master;
+		if (initial != null && initial.isActive())
+			return initial;
+		synchronized (this) {
+			if (master == null || !master.isActive()) {
+				master = master.getFactory().getExistingInstanceInternal(master.getPath());
+				if (master != null) 
+					master.proxyCount.referenceAdded();
+			}
+			return master;
+		}
 	}
 
 }
