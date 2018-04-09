@@ -24,7 +24,7 @@ import org.ogema.core.channelmanager.measurements.SampledValue;
 import org.ogema.core.recordeddata.RecordedDataConfiguration;
 import org.ogema.core.recordeddata.RecordedDataConfiguration.StorageType;
 import org.ogema.recordeddata.DataRecorderException;
-import org.smartrplace.logging.fendodb.impl.SlotsDbStorage;
+import org.smartrplace.logging.fendodb.FendoTimeSeries;
 
 /**
  *
@@ -41,7 +41,7 @@ public class AppendValueTest extends DbTest {
 		RecordedDataConfiguration conf = new RecordedDataConfiguration();
 		conf.setFixedInterval(1000);
 		conf.setStorageType(StorageType.FIXED_INTERVAL);
-		final SlotsDbStorage rds = (SlotsDbStorage) sdb.createRecordedDataStorage("appendValue", conf);
+		final FendoTimeSeries rds = sdb.createRecordedDataStorage("appendValue", conf);
 		rds.insertValue(new SampledValue(new DoubleValue(1.0), System.currentTimeMillis(), Quality.GOOD));
 		Assert.assertTrue(true);
 

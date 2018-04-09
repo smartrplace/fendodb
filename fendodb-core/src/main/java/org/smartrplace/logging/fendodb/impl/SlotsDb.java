@@ -51,7 +51,6 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Lock;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
@@ -112,10 +111,10 @@ public class SlotsDb implements CloseableDataRecorder {
 	private final SlotsDbFactoryImpl factory;
 	private final FendoDbConfiguration config;
 	private final DelayedTask tagsPersistence;
-	private final AtomicInteger proxyCount = new AtomicInteger(0);
+	private final AtomicBoolean closed = new AtomicBoolean(false);
+	final ReferenceCounter proxyCount = new ReferenceCounter(closed);
 
 	final boolean secure;
-	private final AtomicBoolean closed = new AtomicBoolean(false);
 	final FrameworkClock clock;
 	private final Set<Consumer<FendoTimeSeries>> timeSeriesListeners = Collections.synchronizedSet(new HashSet<>(2)); // typically empty or one entry
 
@@ -438,7 +437,7 @@ public class SlotsDb implements CloseableDataRecorder {
 	}
 
 	void proxyClosed() {
-		if (proxyCount.decrementAndGet() <= 0)
+		if (proxyCount.referenceRemoved() <= 0)
 			close();
 	}
 
@@ -749,23 +748,22 @@ public class SlotsDb implements CloseableDataRecorder {
 
 	CloseableDataRecorder getProxyDb(boolean readOnly) {
 		checkActiveStatus();
-		proxyCount.incrementAndGet();
+		proxyCount.referenceAdded();
 		try {
 			return new SlotsDbProxy(this, readOnly);
 		} catch (Throwable e) {
-			proxyCount.decrementAndGet();
+			proxyCount.referenceRemoved();
 			throw e;
 		}
 	}
 
 	void referenceRemoved() {
-		if (proxyCount.decrementAndGet() <= 0)
+		if (proxyCount.referenceRemoved() <= 0)
 			close();
 	}
 
 	void referenceAdded() {
-		if (!closed.get())
-			proxyCount.incrementAndGet();
+		proxyCount.referenceAdded();
 	}
 
 	@Override
@@ -854,7 +852,7 @@ public class SlotsDb implements CloseableDataRecorder {
 	}
 
 	int getReferenceCount() {
-		return proxyCount.get();
+		return proxyCount.getReferenceCount();
 	}
 
 	private final void checkActiveStatus() {

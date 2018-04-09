@@ -17,16 +17,12 @@ package org.smartrplace.logging.fendodb.impl;
 
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
-import java.lang.reflect.Method;
-import java.lang.reflect.Proxy;
 import java.net.URLEncoder;
 import java.security.AccessControlException;
 import java.security.AccessController;
-import java.security.PrivilegedAction;
 import java.security.PrivilegedActionException;
 import java.security.PrivilegedExceptionAction;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
@@ -38,20 +34,15 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
-import java.util.function.Function;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
-
 import org.ogema.core.channelmanager.measurements.IllegalConversionException;
 import org.ogema.core.channelmanager.measurements.Quality;
 import org.ogema.core.channelmanager.measurements.SampledValue;
-import org.ogema.core.recordeddata.RecordedData;
 import org.ogema.core.recordeddata.RecordedDataConfiguration;
 import org.ogema.core.recordeddata.RecordedDataConfiguration.StorageType;
 import org.ogema.core.recordeddata.ReductionMode;
 import org.ogema.core.timeseries.InterpolationMode;
 import org.ogema.recordeddata.DataRecorderException;
-import org.ogema.recordeddata.RecordedDataStorage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.smartrplace.logging.fendodb.FendoTimeSeries;
@@ -60,8 +51,10 @@ import org.smartrplace.logging.fendodb.impl.reduction.ReductionFactory;
 
 class SlotsDbStorage implements FendoTimeSeries {
 
+	/*
 	private static final Map<String, Method> readOnlyMethods;
 	private static final Map<String, Method> writeMethods;
+	*/
 
 	// guarded by lock
 	private RecordedDataConfiguration configuration;
@@ -71,6 +64,7 @@ class SlotsDbStorage implements FendoTimeSeries {
 	// write operations are synchronized on tags itself
 	final Map<String, List<String>> tags = new ConcurrentHashMap<>(4);
 	
+	/*
 	static {
 		readOnlyMethods = AccessController.doPrivileged(new PrivilegedAction<Map<String,Method>>() {
 
@@ -97,26 +91,29 @@ class SlotsDbStorage implements FendoTimeSeries {
 		});
 	}
 	
+	
 	private static boolean isWriteMethod(final Method m) {
 		final String name = m.getName();
 		return name.startsWith("set") || name.startsWith("remove") || name.startsWith("add");
 	}
+	*/
 	
 	private final ReadWriteLock lock = new ReentrantReadWriteLock();
 	
 	private final static Logger logger = LoggerFactory.getLogger(SlotsDbStorage.class);
 
-	public SlotsDbStorage(String id, RecordedDataConfiguration configuration, SlotsDb recorder) {
+	SlotsDbStorage(String id, RecordedDataConfiguration configuration, SlotsDb recorder) {
 		this.configuration = configuration;
 		this.id = id;
 		this.recorder = recorder;
 		this.idEncoded = encodedLabel(id);
 	}
 	
-	static FendoTimeSeries getProxy(final FendoTimeSeries storage, final boolean readOnly) {
+	static FendoTimeSeries getProxy(final FendoTimeSeries storage, final ReferenceCounter counter, final boolean readOnly) {
 		if (storage == null)
 			return null;
-		return (FendoTimeSeries) Proxy.newProxyInstance(SlotsDbStorage.class.getClassLoader(), new Class[] { FendoTimeSeries.class }, 
+		return new SlotsDbStorageProxy(storage, counter, readOnly);
+		/*return (FendoTimeSeries) Proxy.newProxyInstance(SlotsDbStorage.class.getClassLoader(), new Class[] { FendoTimeSeries.class }, 
 				(proxy, method, methodArgs) -> {
 					final String id = method.getName() + method.getParameterCount();
 				    final Method m = readOnlyMethods.get(id);
@@ -130,6 +127,7 @@ class SlotsDbStorage implements FendoTimeSeries {
 				    }
 				    throw new NoSuchMethodException("Method " + method.getName() + " not found");
 			});
+			*/
 	}
 	
 	private final static String encodedLabel(final String label) {

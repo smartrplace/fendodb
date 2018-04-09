@@ -66,12 +66,12 @@ class SlotsDbProxy implements CloseableDataRecorder {
 			throws DataRecorderException {
 		if (!hasWritePermission)
 			throw new AccessControlException("Write permission required to create a new configuration");
-		return master.createRecordedDataStorage(id, configuration);
+		return SlotsDbStorage.getProxy(master.createRecordedDataStorage(id, configuration), master.proxyCount, false);
 	}
 
 	@Override
 	public FendoTimeSeries getRecordedDataStorage(String id) {
-		return SlotsDbStorage.getProxy(master.getRecordedDataStorage(id), !hasWritePermission);
+		return SlotsDbStorage.getProxy(master.getRecordedDataStorage(id), master.proxyCount, !hasWritePermission);
 	}
 
 	@Override
@@ -100,7 +100,7 @@ class SlotsDbProxy implements CloseableDataRecorder {
 	@Override
 	public List<FendoTimeSeries> getAllTimeSeries() {
 		return master.getAllTimeSeriesInternal()
-			.map(ts -> SlotsDbStorage.getProxy(ts, !hasWritePermission))
+			.map(ts -> SlotsDbStorage.getProxy(ts, master.proxyCount, !hasWritePermission))
 			.collect(Collectors.toList());
 	}
 
@@ -204,7 +204,7 @@ class SlotsDbProxy implements CloseableDataRecorder {
 	@Override
 	public List<FendoTimeSeries> findTimeSeries(TimeSeriesMatcher filter) {
 		return master.findTimeSeriesInternal(filter)
-				.map(ts -> SlotsDbStorage.getProxy(ts, !hasWritePermission))
+				.map(ts -> SlotsDbStorage.getProxy(ts, master.proxyCount, !hasWritePermission))
 				.collect(Collectors.toList());
 	}
 
