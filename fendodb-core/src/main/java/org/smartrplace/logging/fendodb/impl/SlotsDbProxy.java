@@ -59,6 +59,7 @@ class SlotsDbProxy implements CloseableDataRecorder {
 		this.config = FendoDbConfigurationBuilder.getInstance(cfg)
 				.setReadOnlyMode(readOnly)
 				.build();
+		master.proxyCount.referenceAdded();
 	}
 
 	@Override
@@ -89,7 +90,7 @@ class SlotsDbProxy implements CloseableDataRecorder {
 	@Override
 	public void close() throws IOException {
 		if (!closed.getAndSet(true))
-			master.proxyClosed();
+			master.proxyCount.referenceRemoved();
 	}
 
 	@Override

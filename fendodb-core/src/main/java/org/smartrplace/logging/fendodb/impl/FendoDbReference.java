@@ -33,12 +33,12 @@ class FendoDbReference implements DataRecorderReference {
 	FendoDbReference(SlotsDb master, boolean isSecure) {
 		this.master = Objects.requireNonNull(master);
 		this.isSecure = isSecure;
-		master.referenceAdded();
+		master.proxyCount.referenceAdded();
 	}
 
 	@Override
 	protected void finalize() throws Throwable {
-		master.referenceRemoved();
+		master.proxyCount.referenceRemoved();
 	}
 
 	@Override

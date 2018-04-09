@@ -43,6 +43,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
@@ -112,7 +113,7 @@ public class SlotsDb implements CloseableDataRecorder {
 	private final FendoDbConfiguration config;
 	private final DelayedTask tagsPersistence;
 	private final AtomicBoolean closed = new AtomicBoolean(false);
-	final ReferenceCounter proxyCount = new ReferenceCounter(closed);
+	final ReferenceCounter proxyCount;
 
 	final boolean secure;
 	final FrameworkClock clock;
@@ -148,6 +149,10 @@ public class SlotsDb implements CloseableDataRecorder {
 			} catch (Exception ignore) {}
 			throw new IOException("Could not acquire the database lock. Maybe it is open in another process? File " + lockFile);
 		}
+		this.proxyCount = new ReferenceCounter(closed, () -> {
+			SlotsDb.this.close();
+			return null;
+		});
 		try {
 			final boolean parseFolders = Files.exists(dbBaseFolder) && (!Files.exists(slotsDbStoragePath) ||
 					(configuration != null && configuration.isReadFolders()));
@@ -436,11 +441,6 @@ public class SlotsDb implements CloseableDataRecorder {
 		return new FendoDbReference(new SlotsDb(target, clock, config, privileged ? null : factory, true), secure);
 	}
 
-	void proxyClosed() {
-		if (proxyCount.referenceRemoved() <= 0)
-			close();
-	}
-
 	@Override
 	public void close() {
 		closePrivileged(false);
@@ -460,6 +460,7 @@ public class SlotsDb implements CloseableDataRecorder {
 		// must be set after tagsPersistence is executed, otherwise the latter is bound to fail
 		if (closed.getAndSet(true))
 			return;
+		FileObjectProxy.logger.info("Closing FendoDB {}",path);
 		proxy.close();
 		synchronized (slotsDbStorages) {
 			slotsDbStorages.clear();
@@ -748,22 +749,7 @@ public class SlotsDb implements CloseableDataRecorder {
 
 	CloseableDataRecorder getProxyDb(boolean readOnly) {
 		checkActiveStatus();
-		proxyCount.referenceAdded();
-		try {
-			return new SlotsDbProxy(this, readOnly);
-		} catch (Throwable e) {
-			proxyCount.referenceRemoved();
-			throw e;
-		}
-	}
-
-	void referenceRemoved() {
-		if (proxyCount.referenceRemoved() <= 0)
-			close();
-	}
-
-	void referenceAdded() {
-		proxyCount.referenceAdded();
+		return new SlotsDbProxy(this, readOnly);
 	}
 
 	@Override
