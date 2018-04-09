@@ -13,7 +13,7 @@ FendoDB is a fork of the OGEMA timeseries database ([SlotsDB](https://github.com
 * supports Java permissions
 * besides the default one-file-per-day mode, other base intervals can be configured, such as hours, weeks or months
 
-It is best used with [OGEMA](www.ogema.org), but can be integrated in a standalone Java-application as well. Some features are only available when used with OGEMA (REST user permissions, visualization), or at least with OSGi (REST interface, shell commands).
+It is best used with [OGEMA](http://www.ogema.org), but can be integrated in a standalone Java-application as well. Some features are only available when used with OGEMA (REST user permissions, visualization), or at least with OSGi (REST interface, shell commands). See [Usage](https://github.com/smartrplace/fendodb/wiki/Usage).
 
 FendoDB requires Java 8 or higher.
 
