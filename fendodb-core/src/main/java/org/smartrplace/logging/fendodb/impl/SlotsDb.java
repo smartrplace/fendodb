@@ -269,7 +269,7 @@ public class SlotsDb implements CloseableDataRecorder {
 		if (Objects.requireNonNull(newConfiguration).equals(config))
 			return new FendoDbReference(this, this.secure);
 		if (!requiresHardReset(config, newConfiguration)) {
-			this.closePrivileged(true); // unregisters from factory
+			this.closePrivileged(true, false); // unregisters from factory
 			final SlotsDb newInstance = new SlotsDb(path, clock, newConfiguration, factory, true);
 			return new FendoDbReference(newInstance, this.secure);
 		}
@@ -303,10 +303,10 @@ public class SlotsDb implements CloseableDataRecorder {
 	// requires folder write lock to be held
 	private FendoDbReference updateInternal(final FendoDbConfiguration newConfiguration) throws IOException {
 		proxy.clearOpenFilesHashMap(); // flush this db
-		final Path tempFolder = Files.createTempDirectory(path.toAbsolutePath().getParent(), "slotsTemp");
+		final Path tempFolder = Files.createTempDirectory(path.toAbsolutePath().getParent(), "slotsTemp_" + path.getFileName().toString());
 		final SlotsDb copy = copy(tempFolder, newConfiguration, null, Long.MIN_VALUE, Long.MAX_VALUE, true).getMaster();
-		copy.closePrivileged(false);
-		this.closePrivileged(true);
+		copy.closePrivileged(false, false);
+		this.closePrivileged(true, false);
 		Path target = path;
 		try {
 			FileUtils.deleteDirectory(path.toFile());
@@ -443,10 +443,10 @@ public class SlotsDb implements CloseableDataRecorder {
 
 	@Override
 	public void close() {
-		closePrivileged(false);
+		closePrivileged(false, false);
 	}
 
-	void closePrivileged(final boolean updatePending) {
+	void closePrivileged(final boolean updatePending, final boolean fromFinalizer) {
 		final Future<?> future = tagsPersistence.close();
 		try {
 			future.get(2, TimeUnit.SECONDS);
@@ -477,13 +477,13 @@ public class SlotsDb implements CloseableDataRecorder {
 			lockFile.close();
 		} catch (Exception ignore) {}
 		if (factory != null) // null only in tests
-			factory.remove(this, updatePending);
+			factory.remove(this, updatePending, fromFinalizer);
 	}
 
 	// release all file locks!
 	@Override
 	protected void finalize() throws Throwable {
-		this.close();
+		this.closePrivileged(false, true);
 	}
 
 	final FileObjectProxy getProxy() {

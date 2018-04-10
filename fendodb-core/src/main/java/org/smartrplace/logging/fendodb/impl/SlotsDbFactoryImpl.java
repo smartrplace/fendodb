@@ -343,7 +343,7 @@ public class SlotsDbFactoryImpl implements FendoDbFactory {
 	}
 
 	// called by the db itself
-	void remove(final SlotsDb slotsdb, final boolean updatePending) {
+	void remove(final SlotsDb slotsdb, final boolean updatePending, final boolean fromFinalizer) {
 		boolean found = false;
 		synchronized (instances) {
 			Iterator<SlotsDb> it = instances.values().iterator();
@@ -360,7 +360,8 @@ public class SlotsDbFactoryImpl implements FendoDbFactory {
 			else if (found)
 				closedInstances.add(slotsdb.getPath());
 		}
-		if (found && !listeners.isEmpty()) {
+		// if the call comes from the finalizer of the SlotsDb, we must not recreate any references to it
+		if (!fromFinalizer && found && !listeners.isEmpty()) {
 			final ExecutorService exec = getExecutor();
 			listeners.forEach(l -> pendingCallbacks.add(exec.submit(new ListenerRunnable(l, slotsdb, isSecure, false))));
 		}
