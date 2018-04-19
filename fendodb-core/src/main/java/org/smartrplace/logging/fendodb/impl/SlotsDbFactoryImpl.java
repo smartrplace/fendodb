@@ -104,6 +104,7 @@ public class SlotsDbFactoryImpl implements FendoDbFactory {
 			"deleteDataBefore",
 			"deleteDataOlderThan",
 			"findTimeSeries",
+			"getAllFendoDbTimeSeries",
 			"getAllProperties",
 			"getAllPropertyValues",
 			"getPropertiesById",

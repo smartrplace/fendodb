@@ -19,7 +19,6 @@ import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.RandomAccessFile;
-import java.io.UnsupportedEncodingException;
 import java.net.URLDecoder;
 import java.nio.channels.FileLock;
 import java.nio.channels.OverlappingFileLockException;
@@ -43,7 +42,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
-import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
@@ -609,9 +607,11 @@ public class SlotsDb implements CloseableDataRecorder {
 							String filename;
 							try {
 								filename = URLDecoder.decode(path.getFileName().toString(), "UTF-8");
-								if (filename.contains("%2F"))
+								if (filename.contains("%2F")) {
+									Files.move(path, path.getParent().resolve(filename));
 									filename = URLDecoder.decode(filename, "UTF-8");
-							} catch (UnsupportedEncodingException e) {
+								}
+							} catch (IOException e) {
 								FileObjectProxy.logger.warn("Reading SlotsDb directory " + path + " failed",e);
 								return;
 							}

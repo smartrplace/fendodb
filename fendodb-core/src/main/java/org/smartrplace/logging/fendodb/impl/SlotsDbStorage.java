@@ -139,12 +139,12 @@ class SlotsDbStorage implements FendoTimeSeries {
 			throw new RuntimeException(e);
 		}
 		// should be false in any reasonable system
-		boolean use252F = Boolean.getBoolean("org.ogema.recordeddata.slotsdb.use252F");
-		if (use252F) {
-			encodedLabel = encodedLabel.replace("%2F", "%252F");				
-		} else {
+//		boolean use252F = Boolean.getBoolean("org.ogema.recordeddata.slotsdb.use252F");
+//		if (use252F) {
+//			encodedLabel = encodedLabel.replace("%2F", "%252F");				
+//		} else {
 			encodedLabel = encodedLabel.replace("%252F", "%2F");				
-		}
+//		}
 		return encodedLabel;
 	}
 	

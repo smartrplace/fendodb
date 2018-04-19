@@ -97,8 +97,21 @@ class GogoCommands {
 		}
 	}
 
+	@Descriptor("Get a time series")
+	public FendoTimeSeries getFendoDbTimeSeries(
+			@Descriptor("The path for the FendoDb instance") final String path,
+			@Descriptor("The timeseries id") final String id) throws IOException {
+		try (final CloseableDataRecorder instance = factory.getExistingInstance(Paths.get(path))) {
+			if (instance == null) {
+				System.out.println("FendoDb instance for path " + path + " not found");
+				return null;
+			}
+			return instance.getRecordedDataStorage(id);
+		}
+	}
+	
 	@Descriptor("Get all time series")
-	public Collection<FendoTimeSeries> getFendoDbTimeSeries(
+	public Collection<FendoTimeSeries> getAllFendoDbTimeSeries(
 			@Descriptor("The path for the FendoDb instance") final String path) throws IOException {
 		try (final CloseableDataRecorder instance = factory.getExistingInstance(Paths.get(path))) {
 			if (instance == null) {
