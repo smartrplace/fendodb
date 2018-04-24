@@ -86,6 +86,8 @@ public class GogoCommands {
 			@Parameter(names= {"-e","--end"}, absentValue="") final String endTime,
 			@Descriptor("Sampling interval in ms")
 			@Parameter(names= {"-i", "--interval"}, absentValue="0") final long samplingInterval,
+			@Descriptor("Maximum number of data points to be written per time series. Defaults to ten million.")
+			@Parameter(names= {"-m", "--max"}, absentValue="-1") final int maxValues,
 			@Descriptor("Time format, such as \"yyyy-MM-dd'T'HH:mm:ss\"")
 			@Parameter(names= {"-f", "--format"}, absentValue="") final String format,
 			@Descriptor("Output format, either CSV, XML or JSON")
@@ -111,7 +113,7 @@ public class GogoCommands {
 		}
 		try (final CloseableDataRecorder slots = factory.getInstance(Paths.get(dbPath))) {
 			if (slots.isEmpty()) {
-				System.out.println("SlotsDb instance found empty");
+				System.out.println("FendoDb instance found empty");
 				return;
 			}
 			final FendodbSerializationFormat sf = FendodbSerializationFormat.valueOf(output.toUpperCase());
@@ -120,6 +122,8 @@ public class GogoCommands {
 					.setDoZip(zip);
 			if (!format.isEmpty())
 				configBuilder.setFormatter(DateTimeFormatter.ofPattern(format, Locale.ENGLISH));
+			if (maxValues > 0)
+				configBuilder.setMaxNrValues(maxValues);
 			if (!startTime.isEmpty() || !endTime.isEmpty())
 				configBuilder.setInterval(parseTimeString(startTime, Long.MIN_VALUE), parseTimeString(endTime, Long.MAX_VALUE));
 			final SearchFilterBuilder filterBuilder = SearchFilterBuilder.getInstance();

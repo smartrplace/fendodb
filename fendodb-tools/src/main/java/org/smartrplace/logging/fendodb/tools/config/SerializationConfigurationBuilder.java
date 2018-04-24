@@ -30,7 +30,7 @@ public class SerializationConfigurationBuilder {
 	private DateTimeFormatter formatter = null;
 	private ZoneId timeZone = ZoneId.of("Z"); // default: UTC
 	private Long samplingInterval;
-	private int maxNrValues = 10000;
+	private int maxNrValues = 10000000;
 	private FendodbSerializationFormat format = FendodbSerializationFormat.CSV;
 
 	private SerializationConfigurationBuilder() {}
@@ -142,7 +142,7 @@ public class SerializationConfigurationBuilder {
 	}
 
 	/**
-	 * Set the maximum number of entries to be written. Defaults to 10000.
+	 * Set the maximum number of entries to be written. Defaults to ten million (10000000).
 	 * @param maxNrValues
 	 * @return
 	 */
