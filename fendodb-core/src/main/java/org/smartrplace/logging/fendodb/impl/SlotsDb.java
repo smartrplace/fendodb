@@ -665,7 +665,7 @@ public class SlotsDb implements CloseableDataRecorder {
 			public void run() {
 				listeners.forEach(listener -> listener.accept(timeSeries));
 			}
-		}, "SlotsDb-listener-dispatch").start();
+		}, "FendoDb-listener-dispatch").start();
 	}
 
 	@Override
@@ -810,19 +810,21 @@ public class SlotsDb implements CloseableDataRecorder {
 
 	private boolean deleteDataFrom(final long t0, final boolean beforeOrAfter) throws IOException {
 		synchronized (slotsDbStorages) {
+			// folder lock must be obtained after time series lock
+//			proxy.folderLock.writeLock().lock();
+			final Predicate<SlotsDbStorage> filter;
+			if (beforeOrAfter)
+				filter = (ts -> ts.getNextValue(Long.MIN_VALUE).getTimestamp() < t0);
+			else
+				filter = (ts -> ts.getPreviousValue(Long.MAX_VALUE).getTimestamp() >= t0);
+			if (!slotsDbStorages.values().stream()
+					.filter(ts -> !ts.isEmpty())
+					.filter(filter)
+					.findAny().isPresent()) {
+				return false;
+			}
 			proxy.folderLock.writeLock().lock();
 			try {
-				final Predicate<SlotsDbStorage> filter;
-				if (beforeOrAfter)
-					filter = (ts -> ts.getNextValue(Long.MIN_VALUE).getTimestamp() < t0);
-				else
-					filter = (ts -> ts.getPreviousValue(Long.MAX_VALUE).getTimestamp() >= t0);
-				if (!slotsDbStorages.values().stream()
-						.filter(ts -> !ts.isEmpty())
-						.filter(filter)
-						.findAny().isPresent()) {
-					return false;
-				}
 				proxy.clearOpenFilesHashMap();
 				proxy.getDeleteJob().deleteFolders(t0, beforeOrAfter);
 				proxy.clearCache();
