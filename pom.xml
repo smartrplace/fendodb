@@ -62,6 +62,7 @@
 		<module>fendodb-reader</module>
 		<module>fendodb-recordeddata-wrapper</module>
 		<module>fendodb-rest</module>
+		<module>fendodb-source</module>
 		<module>fendodb-tools</module>
 		<module>fendodb-viz</module>
 	</modules>

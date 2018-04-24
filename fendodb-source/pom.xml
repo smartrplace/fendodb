@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+	<parent>
+		<groupId>org.smartrplace.logging</groupId>
+	    <artifactId>fendodb-base</artifactId>
+	    <version>0.0.4-SNAPSHOT</version>
+    </parent>
+    
+    <artifactId>fendodb-source</artifactId>
+    <packaging>bundle</packaging>
+    <name>FendoDb timeseries source</name>
+    <description>FendoDb as source for OGEMA timeseries</description>
+
+    <build>
+        <plugins>
+       		 <plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-compiler-plugin</artifactId>
+			</plugin>
+            <plugin>
+                <groupId>org.apache.felix</groupId>
+                <artifactId>maven-scr-plugin</artifactId>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.felix</groupId>
+                <artifactId>maven-bundle-plugin</artifactId>
+                <configuration>
+                    <instructions>
+                        <Export-Package></Export-Package>
+                    </instructions>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+
+    <dependencies>
+        <dependency>
+            <groupId>org.osgi</groupId>
+            <artifactId>org.osgi.core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.osgi</groupId>
+            <artifactId>org.osgi.compendium</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.felix</groupId>
+            <artifactId>org.apache.felix.scr.annotations</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.ogema.core</groupId>
+            <artifactId>api</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.ogema.core</groupId>
+            <artifactId>models</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>de.iwes.widgets</groupId>
+            <artifactId>ogema-js-bundle</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>de.iwes.widgets</groupId>
+            <artifactId>widget-collection</artifactId>
+        </dependency>  
+        <dependency>
+            <groupId>de.iwes.widgets</groupId>
+            <artifactId>widget-experimental</artifactId>
+        </dependency>  
+        <dependency>
+            <groupId>de.iwes.tools</groupId>
+            <artifactId>timeseries-eval-base</artifactId>
+			<version>${ogema.widgets.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.smartrplace.logging</groupId>
+            <artifactId>fendodb-api</artifactId>
+        </dependency>
+    </dependencies>
+
+</project>
