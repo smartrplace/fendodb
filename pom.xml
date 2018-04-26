@@ -47,13 +47,13 @@
 		<ogema.widgets.version>2.1.3</ogema.widgets.version>
 		<slf4j.version>1.7.2</slf4j.version>
 		<maven-source-plugin.version>3.0.1</maven-source-plugin.version>
+		<maven-javadoc-plugin.version>3.0.0</maven-javadoc-plugin.version>
 		<!-- max versions exclusive -->
 		<guava.version.min>19.0</guava.version.min>
 		<guava.version.max>25.0</guava.version.max>
 		<felix.service.command.version.min>0.0.0</felix.service.command.version.min>
 		<felix.service.command.version.max>2.0.0</felix.service.command.version.max>
 	</properties>
-
 	<modules>
 		<module>fendodb-api</module>
 		<module>fendodb-core</module>
@@ -66,7 +66,6 @@
 		<module>fendodb-tools</module>
 		<module>fendodb-viz</module>
 	</modules>
-
 	<build>
 		<pluginManagement>
 			<plugins>
@@ -215,6 +214,10 @@
 							</goals>
 						</execution>
 					</executions>
+					<configuration>
+				         <additionalparam>-Xdoclint:none</additionalparam>
+				         <additionalOptions>-Xdoclint:none</additionalOptions>
+				      </configuration>
 				</plugin>
 
 				<plugin>

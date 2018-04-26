@@ -71,7 +71,7 @@ public class FendoDbVisualisationApp implements Application {
 			}
 		}
 
-		wApp = widgetService.createWidgetApp("/org/smartrplace/slotsdb/visualisation", appManager);
+		wApp = widgetService.createWidgetApp("/org/smartrplace/fendodb/visualisation", appManager);
 		final WidgetPage<?> vizPageOld = wApp.createWidgetPage("slots-viz.html");
 		new FendoPlotPage(vizPageOld, slotsDbFactory, appManager, widgetService.getNameService());
 
