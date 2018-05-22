@@ -145,6 +145,7 @@ class FendoPage2 {
 				.setShowDownsamplingInterval(true)
 				.build();
 		this.scheduleViewer = new ScheduleViewerBasic<>(page, "scheduleViewer", am, cfg, null);
+		scheduleViewer.getDefaultPlotConfiguration().doScale(false);
 		buildPage();
 		setDependencies();
 	}
