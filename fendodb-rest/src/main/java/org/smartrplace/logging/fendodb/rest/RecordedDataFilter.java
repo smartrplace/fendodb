@@ -32,15 +32,14 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.servlet.http.HttpSession;
 
-import org.apache.felix.scr.annotations.Component;
-import org.apache.felix.scr.annotations.Property;
-import org.apache.felix.scr.annotations.Reference;
-import org.apache.felix.scr.annotations.Service;
 import org.ogema.accesscontrol.Constants;
 import org.ogema.accesscontrol.PermissionManager;
 import org.ogema.accesscontrol.UserRightsProxy;
 import org.ogema.core.administration.AdminApplication;
 import org.ogema.core.administration.AdministrationManager;
+import org.osgi.service.component.ComponentServiceObjects;
+import org.osgi.service.component.annotations.Component;
+import org.osgi.service.component.annotations.Reference;
 import org.osgi.service.http.whiteboard.HttpWhiteboardConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -48,16 +47,18 @@ import org.smartrplace.logging.fendodb.permissions.FendoDbPermission;
 
 // main part of this class is copied from the OGEMA rest project (class RestAccess)
 
-@Component
-@Property(name = HttpWhiteboardConstants.HTTP_WHITEBOARD_FILTER_PATTERN, value = RecordedDataServlet.ALIAS)
-@Service(Filter.class)
+
+@Component(
+		service=Filter.class,
+		property = HttpWhiteboardConstants.HTTP_WHITEBOARD_FILTER_PATTERN + "=" + RecordedDataServlet.ALIAS
+)
 public class RecordedDataFilter implements Filter {
 	
 	private static final Logger logger = LoggerFactory.getLogger(RecordedDataFilter.class);
     @Reference
-    private PermissionManager permMan;
+    private ComponentServiceObjects<PermissionManager> permManService;
     @Reference
-    private AdministrationManager adminMan;
+    private ComponentServiceObjects<AdministrationManager> adminManService;
 	
 	@Override
 	public void init(FilterConfig filterConfig) throws ServletException {}
@@ -74,11 +75,16 @@ public class RecordedDataFilter implements Filter {
 		}
 		chain.doFilter(request, response);
 	}
-
+	
 	boolean checkAccess(final HttpServletRequest req) {
 		final String path = req.getParameter(Parameters.PARAM_DB);
 		if (path == null || path.trim().isEmpty())
 			return true; // FIXME depends on method
+		return Utils.useService(adminManService, adminMan -> Utils.useService(permManService, permMan -> checkAccess(req, adminMan, permMan)));
+	}
+
+	private static boolean checkAccess(final HttpServletRequest req, AdministrationManager adminMan, PermissionManager permMan) {
+		final String path = req.getParameter(Parameters.PARAM_DB);
 		final Path database = Paths.get(path).normalize();
 		final HttpSession ses = req.getSession();
 		
@@ -108,7 +114,7 @@ public class RecordedDataFilter implements Filter {
 		}
 		final FendoDbPermission perm = new FendoDbPermission("perm", database.toString().replace('\\', '/'), action);
 		final boolean result;
-		if (check1TimePW(ses, usr, pwd)) {
+		if (check1TimePW(ses, usr, pwd, permMan)) {
 			// Get the AccessControlContex of the involved app
 			final AdminApplication aaa = adminMan.getAppById(usr);
 			if (aaa == null) {
@@ -118,7 +124,7 @@ public class RecordedDataFilter implements Filter {
 				result = pda.implies(perm);
 			}
 		}
-		else if (checkM2MUserPW(usr, pwd)) {
+		else if (checkM2MUserPW(usr, pwd, permMan)) {
 			final UserRightsProxy urp = permMan.getAccessManager().getUrp(usr);
 			if (urp == null)
 				return false;
@@ -165,14 +171,14 @@ public class RecordedDataFilter implements Filter {
 	 * known in the current session. In case of an external entity the AccessManager is asked for the authorization of
 	 * the user. In both cases the requested URL has to contain the pair of parameter OTPNAME and OTUNAME.
 	 */
-	private boolean check1TimePW(HttpSession ses, String usr, String pwd) {
+	private static boolean check1TimePW(HttpSession ses, String usr, String pwd, PermissionManager permMan) {
 		/*
 		 * If the app is already registered with this one time password the access is permitted.
 		 */
 		return permMan.getWebAccess().authenticate(ses, usr, pwd);
 	}
 
-	private final boolean checkM2MUserPW(String usr, String pwd) {
+	private static boolean checkM2MUserPW(String usr, String pwd, PermissionManager permMan) {
 		/*
 		 * Is there an user registered with the credentials attached to the request?
 		 */

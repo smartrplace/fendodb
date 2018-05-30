@@ -38,18 +38,17 @@ import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
-import org.apache.felix.scr.annotations.Component;
-import org.apache.felix.scr.annotations.Property;
-import org.apache.felix.scr.annotations.Reference;
-import org.apache.felix.scr.annotations.ReferenceCardinality;
-import org.apache.felix.scr.annotations.ReferencePolicy;
-import org.apache.felix.scr.annotations.ReferencePolicyOption;
-import org.apache.felix.scr.annotations.Service;
 import org.ogema.core.administration.FrameworkClock;
 import org.ogema.core.channelmanager.measurements.SampledValue;
 import org.ogema.core.recordeddata.RecordedDataConfiguration;
 import org.ogema.core.recordeddata.RecordedDataConfiguration.StorageType;
 import org.ogema.recordeddata.DataRecorderException;
+import org.osgi.service.component.ComponentServiceObjects;
+import org.osgi.service.component.annotations.Component;
+import org.osgi.service.component.annotations.Reference;
+import org.osgi.service.component.annotations.ReferenceCardinality;
+import org.osgi.service.component.annotations.ReferencePolicy;
+import org.osgi.service.component.annotations.ReferencePolicyOption;
 import org.osgi.service.http.whiteboard.HttpWhiteboardConstants;
 import org.smartrplace.logging.fendodb.CloseableDataRecorder;
 import org.smartrplace.logging.fendodb.FendoDbFactory;
@@ -62,9 +61,10 @@ import org.smartrplace.logging.fendodb.tools.config.SerializationConfigurationBu
 import org.smartrplace.logging.fendodb.tools.config.FendodbSerializationFormat;
 
 // TODO POST value triggers info tasks -> ?
-@Component
-@Property(name = HttpWhiteboardConstants.HTTP_WHITEBOARD_SERVLET_PATTERN, value = RecordedDataServlet.ALIAS)
-@Service(Servlet.class)
+@Component(
+	service=Servlet.class,
+	property=HttpWhiteboardConstants.HTTP_WHITEBOARD_SERVLET_PATTERN + "=" + RecordedDataServlet.ALIAS
+)
 public class RecordedDataServlet extends HttpServlet {
 
 //	private static final Logger logger = LoggerFactory.getLogger(RecordedDataServlet.class);
@@ -84,19 +84,20 @@ public class RecordedDataServlet extends HttpServlet {
     	"text/xml"
     };
 
-
+    // ok to construct this eagerly, we need it anyway...
     @Reference
     private FendoDbFactory factory;
 
-    @Reference
-    private StatisticsService statistics;
+    @Reference(service=StatisticsService.class)
+    private ComponentServiceObjects<StatisticsService> statisticsService;
 
     @Reference(
-    		cardinality=ReferenceCardinality.OPTIONAL_UNARY,
+    		service=FrameworkClock.class,
+    		cardinality=ReferenceCardinality.OPTIONAL,
     		policy=ReferencePolicy.DYNAMIC,
     		policyOption=ReferencePolicyOption.GREEDY
     )
-    private volatile FrameworkClock clock;
+    private volatile ComponentServiceObjects<FrameworkClock> clockService;
 
     // TODO support multipart?
     @Override
@@ -132,7 +133,14 @@ public class RecordedDataServlet extends HttpServlet {
     		case Parameters.TARGET_VALUE:
     			// {"value":12.3,"time":34}
     			// <entry><value>32.3</value><time>34</time></entry>
-    			Deserialization.deserializeValue(req.getReader(), timeSeries, format, clock, resp);
+    			final ComponentServiceObjects<FrameworkClock> clockService = this.clockService;
+    			final FrameworkClock clock = clockService == null ? null : clockService.getService();
+    			try {
+    				Deserialization.deserializeValue(req.getReader(), timeSeries, format, clock, resp);
+    			} finally {
+    				if (clock != null)
+    					clockService.ungetService(clock);
+    			}
     			break;
     		case Parameters.TARGET_VALUES:
     			Deserialization.deserializeValues(req.getReader(), timeSeries, format, resp);
@@ -508,10 +516,15 @@ public class RecordedDataServlet extends HttpServlet {
     		final Long start = Utils.parseTimeString(req.getParameter(Parameters.PARAM_START), null);
     		final Long end = Utils.parseTimeString(req.getParameter(Parameters.PARAM_END), null);
     		final Map<String,?> results;
-    		if (start == null || end == null)
-    			results = statistics.evaluateByIds(matches, providerIds);
-    		else
-    			results = statistics.evaluateByIds(matches, providerIds, start, end);
+    		final StatisticsService statistics = statisticsService.getService();
+    		try {
+	    		if (start == null || end == null)
+	    			results = statistics.evaluateByIds(matches, providerIds);
+	    		else
+	    			results = statistics.evaluateByIds(matches, providerIds, start, end);
+    		} finally {
+    			statisticsService.ungetService(statistics);
+    		}
 	    	serializeMap(resp, format, results, "statistics");
     	}
     }
@@ -704,16 +717,25 @@ public class RecordedDataServlet extends HttpServlet {
         		writer.write('<');
         		writer.write(entryTag);
         		writer.write('>');
-        		writer.write(id);
+	        		writer.write('<');
+	        		writer.write("id");
+	        		writer.write('>');
+        				writer.write(id);
+    				writer.write('<');
+	        		writer.write('/');
+	        		writer.write("id");
+	        		writer.write('>');
+	        		writer.write('<');
+	        		writer.write("value");
+	        		writer.write('>');
+	        			writer.write(value.toString());
+	        		writer.write('<');
+	        		writer.write('/');
+	        		writer.write("value");
+	        		writer.write('>');
         		writer.write('<');
         		writer.write('/');
         		writer.write(entryTag);
-        		writer.write('>');
-        		writer.write('<');
-        		writer.write("value");
-        		writer.write('>');
-        		writer.write(value.toString());
-        		writer.write('/');
         		writer.write('>');
         		writer.write('\n');
         		break;
@@ -727,10 +749,11 @@ public class RecordedDataServlet extends HttpServlet {
         		writer.write(id);
         		writer.write('\"');
         		writer.write(':');
-        		if (!(value instanceof Number))
+        		final boolean isNumber = value instanceof Number; 
+        		if (!isNumber)
         				writer.write('\"');
-        		writer.write(value.toString());
-        		if (!(value instanceof Number))
+        		writer.write((isNumber && Double.isNaN(((Number) value).doubleValue())) ? "null" : value.toString());
+        		if (!isNumber)
     				writer.write('\"');
         		break;
         	default:

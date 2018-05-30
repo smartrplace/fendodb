@@ -19,7 +19,8 @@ class DbItem implements SelectionItem {
 
 	@Override
 	public String id() {
-		return ref.getPath().toString();
+		 // avoid Windows issues: the path is always specified with '/' as separator
+		return ref.getPath().toString().replace('\\', '/');
 	}
 
 	@Override

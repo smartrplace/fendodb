@@ -26,12 +26,14 @@ import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeFormatterBuilder;
 import java.util.Locale;
+import java.util.function.Function;
 
 import org.ogema.core.channelmanager.measurements.BooleanValue;
 import org.ogema.core.channelmanager.measurements.IntegerValue;
 import org.ogema.core.channelmanager.measurements.LongValue;
 import org.ogema.core.channelmanager.measurements.SampledValue;
 import org.ogema.core.channelmanager.measurements.Value;
+import org.osgi.service.component.ComponentServiceObjects;
 import org.smartrplace.logging.fendodb.tools.config.FendodbSerializationFormat;
 
 class Utils {
@@ -115,6 +117,15 @@ class Utils {
 		
 		return sb.toString();
 	}
+
+	static <S,T> T useService(final ComponentServiceObjects<S> service, final Function<S,T> operation) {
+		final S instance= service.getService();
+		try {
+			return operation.apply(instance);
+		} finally {
+			service.ungetService(instance);
+		}
+	}
 	
 	private static final Object getValue(final Value value) {
 		if (value instanceof BooleanValue)
@@ -123,6 +134,6 @@ class Utils {
 			return value.getLongValue();
 		return value.getDoubleValue();
 	}
-	
+
 	
 }

@@ -7,6 +7,7 @@ import java.util.Objects;
 import org.apache.felix.scr.annotations.Activate;
 import org.apache.felix.scr.annotations.Component;
 import org.apache.felix.scr.annotations.Deactivate;
+import org.apache.felix.scr.annotations.Property;
 import org.apache.felix.scr.annotations.Reference;
 import org.apache.felix.scr.annotations.Service;
 import org.ogema.core.timeseries.ReadOnlyTimeSeries;
@@ -25,9 +26,11 @@ import de.iwes.timeseries.eval.base.provider.utils.EvaluationInputImpl;
 import de.iwes.timeseries.eval.base.provider.utils.TimeSeriesDataImpl;
 
 @Service(DataProvider.class)
+@Property(name="provider-id", value=FendoDbSource.ID)
 @Component
 public class FendoDbSource implements DataProvider<FendoTimeSeries> {
 	
+	final static String ID = "fendodbProvider";
 	private volatile LinkingOption[] options;
 	private volatile TimeseriesOption terminal;
 	LinkingOptionType type;
@@ -56,7 +59,7 @@ public class FendoDbSource implements DataProvider<FendoTimeSeries> {
 
 	@Override
 	public String id() {
-		return "fendodbProvider";
+		return ID;
 	}
 
 	@Override
