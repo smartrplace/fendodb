@@ -44,7 +44,7 @@
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 		<osgi.version>5.0.0</osgi.version>
 		<ogema.api.version>2.1.3</ogema.api.version>
-		<ogema.widgets.version>2.1.3</ogema.widgets.version>
+		<ogema.widgets.version>2.2.1-SNAPSHOT</ogema.widgets.version><!-- FIXME -->
 		<slf4j.version>1.7.2</slf4j.version>
 		<maven-source-plugin.version>3.0.1</maven-source-plugin.version>
 		<maven-javadoc-plugin.version>3.0.1</maven-javadoc-plugin.version>
@@ -289,27 +289,27 @@
 
 			<!-- OGEMA widget framework -->
 			<dependency>
-				<groupId>de.iwes.widgets</groupId>
+				<groupId>org.ogema.widgets</groupId>
 				<artifactId>ogema-gui-api</artifactId>
 				<version>${ogema.widgets.version}</version>
 			</dependency>
 			<dependency>
-				<groupId>de.iwes.widgets</groupId>
+				<groupId>org.ogema.widgets</groupId>
 				<artifactId>ogema-js-bundle</artifactId>
 				<version>${ogema.widgets.version}</version>
 			</dependency>
 			<dependency>
-				<groupId>de.iwes.widgets</groupId>
+				<groupId>org.ogema.widgets</groupId>
 				<artifactId>widget-collection</artifactId>
 				<version>${ogema.widgets.version}</version>
 			</dependency>
 			<dependency>
-				<groupId>de.iwes.widgets</groupId>
+				<groupId>org.ogema.widgets</groupId>
 				<artifactId>widget-extended</artifactId>
 				<version>${ogema.widgets.version}</version>
 			</dependency>
 			<dependency>
-				<groupId>de.iwes.widgets</groupId>
+				<groupId>org.ogema.widgets</groupId>
 				<artifactId>widget-experimental</artifactId>
 				<version>${ogema.widgets.version}</version>
 			</dependency>

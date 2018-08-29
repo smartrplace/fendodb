@@ -128,15 +128,10 @@ public class GogoCommands {
 				configBuilder.setInterval(parseTimeString(startTime, Long.MIN_VALUE), parseTimeString(endTime, Long.MAX_VALUE));
 			final SearchFilterBuilder filterBuilder = SearchFilterBuilder.getInstance();
 			if (!tags.isEmpty()) {
-				final List<String> tags2 = Arrays.stream(tags.split(","))
+				Arrays.stream(tags.split(","))
 					.map(string -> string.trim())
 					.filter(string -> !string.isEmpty())
-					.collect(Collectors.toList());
-				if (!tags2.isEmpty()) {
-					final String[] arr = new String[tags2.size()];
-					tags2.toArray(arr);
-					filterBuilder.filterByTags(arr);
-				}
+					.forEach(filterBuilder::filterByTag);
 			}
 			if (!tagsExcluded.isEmpty()) {
 				final List<String> tags2 = Arrays.stream(tagsExcluded.split(","))
@@ -154,10 +149,16 @@ public class GogoCommands {
 					}
 			}
 			if (!properties.isEmpty()) {
+				Arrays.stream(properties.split(","))
+					.map(str -> str.split("="))
+					.filter(arr -> arr.length == 2 && !arr[0].trim().isEmpty())
+					.forEach(arr -> filterBuilder.filterByProperty(arr[0].trim(), arr[1].trim(), true));
+				/*// this would lead to an OR concatenation instead!
 				filterBuilder.filterByProperties(Arrays.stream(properties.split(","))
 					.map(str -> str.split("="))
 					.filter(arr -> arr.length == 2 && !arr[0].trim().isEmpty())
 					.collect(Collectors.toMap(arr -> arr[0].trim(), arr -> arr[1].trim())), true);
+					*/
 			}
 			if (indent < 0)
 				configBuilder.setPrettyPrint(false);

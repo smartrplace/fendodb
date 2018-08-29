@@ -56,19 +56,19 @@
             <artifactId>models</artifactId>
         </dependency>
         <dependency>
-            <groupId>de.iwes.widgets</groupId>
+            <groupId>org.ogema.widgets</groupId>
             <artifactId>ogema-js-bundle</artifactId>
         </dependency>
         <dependency>
-            <groupId>de.iwes.widgets</groupId>
+            <groupId>org.ogema.widgets</groupId>
             <artifactId>widget-collection</artifactId>
         </dependency>  
         <dependency>
-            <groupId>de.iwes.widgets</groupId>
+            <groupId>org.ogema.widgets</groupId>
             <artifactId>widget-experimental</artifactId>
         </dependency>  
         <dependency>
-            <groupId>de.iwes.tools</groupId>
+            <groupId>org.ogema.eval</groupId>
             <artifactId>timeseries-eval-base</artifactId>
 			<version>${ogema.widgets.version}</version>
         </dependency>

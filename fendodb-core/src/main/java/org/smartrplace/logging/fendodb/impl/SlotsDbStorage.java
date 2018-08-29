@@ -585,35 +585,42 @@ class SlotsDbStorage implements FendoTimeSeries {
 			throw new UnsupportedOperationException("Database has been opened in read-only mode");
 
 		lock.writeLock().lock();
-
 		try {
 			this.configuration = configuration;
+		} finally {
+			lock.writeLock().unlock();
+		}
+		try {
+			// must not hold lock here, because recorder#persistStorages retrieves lock in SlotsDb class
 			AccessController.doPrivileged(new PrivilegedExceptionAction<Void>() {
-
+	
 				@Override
 				public Void run() throws Exception {
-
+	
 					// -----------
-
+	
 					recorder.persistSlotsDbStorages();
-
+	
 					// -----------
-
+	
 					return null;
 				}
-
+	
 			});
 		} catch (PrivilegedActionException e) {
 			logger.error("", e);
-		} finally {
-			lock.writeLock().unlock();
 		}
 
 	}
 
 	@Override
 	public RecordedDataConfiguration getConfiguration() {
-		return configuration;
+		lock.readLock().lock();
+		try {
+			return configuration;
+		} finally {
+			lock.readLock().unlock();
+		}
 	}
 
 	@Override

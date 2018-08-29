@@ -44,6 +44,8 @@ public interface FendoDbFactory {
 	 * 		If baseFolder is not accessible.
 	 * @throws NullPointerException
 	 * 		If baseFolder is null.
+	 * @throws SecurityException 
+	 *  	If access is not allowed
 	 */
 	CloseableDataRecorder getInstance(Path baseFolder) throws IOException;
 	
@@ -66,6 +68,8 @@ public interface FendoDbFactory {
 	 * 		If baseFolder is not accessible.
 	 * @throws NullPointerException
 	 * 		If baseFolder is null.
+ 	 * @throws SecurityException 
+	 *  	If access is not allowed
 	 */
 	CloseableDataRecorder getInstance(Path baseFolder, FendoDbConfiguration configuration) throws IOException;
 	
@@ -81,6 +85,8 @@ public interface FendoDbFactory {
 	 * 		If baseFolder is not accessible.
 	 * @throws NullPointerException
 	 * 		If baseFolder is null.
+ 	 * @throws SecurityException 
+	 *  	If access is not allowed
 	 */
 	// TODO configuration options? like read-only mode?
 	CloseableDataRecorder getExistingInstance(Path baseFolder) throws IOException;

@@ -18,30 +18,28 @@
 	<dependencies>
 		<dependency>
 			<groupId>org.osgi</groupId>
-			<artifactId>org.osgi.core</artifactId>
+			<artifactId>osgi.core</artifactId>
+			<version>6.0.0</version>
 		</dependency>
 		<dependency>
 			<groupId>org.osgi</groupId>
-			<artifactId>org.osgi.compendium</artifactId>
-		</dependency>
-		<dependency>
-		    <groupId>org.apache.felix</groupId>
-		    <artifactId>org.apache.felix.scr.annotations</artifactId>
+			<artifactId>osgi.cmpn</artifactId>
+			<version>6.0.0</version>
 		</dependency>
 		<dependency>
 			<groupId>org.ogema.core</groupId>
 			<artifactId>api</artifactId>
 		</dependency>
 		<dependency>
-			<groupId>de.iwes.widgets</groupId>
+			<groupId>org.ogema.widgets</groupId>
 			<artifactId>ogema-gui-api</artifactId>
 		</dependency>
 		<dependency>
-			<groupId>de.iwes.widgets</groupId>
+			<groupId>org.ogema.widgets</groupId>
 			<artifactId>widget-collection</artifactId>
 		</dependency>
 		<dependency>
-			<groupId>de.iwes.widgets</groupId>
+			<groupId>org.ogema.widgets</groupId>
 			<artifactId>widget-experimental</artifactId>
 		</dependency>
 		<dependency>
@@ -53,14 +51,14 @@
 			<artifactId>fendodb-ogema-tagging</artifactId>
 			<version>${project.version}</version>
 		</dependency>
+		<dependency><!-- optional dependency -->
+			<groupId>org.smartrplace.logging</groupId>
+			<artifactId>fendodb-tools</artifactId>
+		</dependency>
 	</dependencies>
 
 	<build>
 		<plugins>
-			<plugin>
-            	<groupId>org.apache.felix</groupId>
-                <artifactId>maven-scr-plugin</artifactId>
-			</plugin>
 			<plugin>
                 <groupId>org.apache.felix</groupId>
                 <artifactId>maven-bundle-plugin</artifactId>
@@ -70,7 +68,12 @@
                         </Export-Package>
                         <Import-Package>
                         	org.smartrplace.logging.fendodb.tagging.api;resolution:=optional,
-                        *</Import-Package>
+                        	org.smartrplace.logging.fendodb.tools;resolution:=optional,
+                        	*
+                        </Import-Package>
+                        <Require-Capability>
+                			ogema.widgets.extender; filter:="(&amp;(ogema.widgets.extender=pages.whiteboard)(version&gt;=1.0)(!(version&gt;=2.0)))"
+                		</Require-Capability>
                     </instructions>
                 </configuration>
             </plugin>

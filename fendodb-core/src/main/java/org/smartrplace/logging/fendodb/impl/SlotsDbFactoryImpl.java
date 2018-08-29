@@ -35,6 +35,7 @@ import java.util.Objects;
 import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.CancellationException;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -47,15 +48,16 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import org.apache.felix.scr.annotations.Activate;
-import org.apache.felix.scr.annotations.Component;
-import org.apache.felix.scr.annotations.Deactivate;
-import org.apache.felix.scr.annotations.Reference;
-import org.apache.felix.scr.annotations.ReferenceCardinality;
-import org.apache.felix.scr.annotations.Service;
 import org.ogema.core.administration.FrameworkClock;
 import org.osgi.framework.BundleContext;
 import org.osgi.framework.ServiceRegistration;
+import org.osgi.service.component.annotations.Activate;
+import org.osgi.service.component.annotations.Component;
+import org.osgi.service.component.annotations.Deactivate;
+import org.osgi.service.component.annotations.Reference;
+import org.osgi.service.component.annotations.ReferenceCardinality;
+import org.osgi.service.component.annotations.ReferencePolicy;
+import org.osgi.service.component.annotations.ReferencePolicyOption;
 import org.slf4j.LoggerFactory;
 import org.smartrplace.logging.fendodb.CloseableDataRecorder;
 import org.smartrplace.logging.fendodb.DataRecorderReference;
@@ -63,10 +65,10 @@ import org.smartrplace.logging.fendodb.FendoDbConfiguration;
 import org.smartrplace.logging.fendodb.FendoDbFactory;
 import org.smartrplace.logging.fendodb.permissions.FendoDbPermission;
 
-@Component(immediate=true)
-@Service(FendoDbFactory.class)
+@Component(immediate=true, service=FendoDbFactory.class)
 public class SlotsDbFactoryImpl implements FendoDbFactory {
 
+	private final CompletableFuture<FendoDbFactory> selfFuture = new CompletableFuture<>();
 	// Map<Path relative to rundir, database>
 	// synchronized on itself
 	private final Map<Path,SlotsDb> instances = new ConcurrentHashMap<>(4);
@@ -86,7 +88,7 @@ public class SlotsDbFactoryImpl implements FendoDbFactory {
 	private volatile Path persistence;
 	private volatile Runnable persistenceTask;
 
-	@Reference(cardinality=ReferenceCardinality.OPTIONAL_UNARY)
+	@Reference(cardinality=ReferenceCardinality.OPTIONAL)
 	private FrameworkClock clock;
 
 	// ctx is null in tests... must be able to deal with this case
@@ -170,6 +172,7 @@ public class SlotsDbFactoryImpl implements FendoDbFactory {
 				}
 			}
 		};
+		this.selfFuture.complete(this);
 	}
 
 	@Deactivate
@@ -200,6 +203,7 @@ public class SlotsDbFactoryImpl implements FendoDbFactory {
 					exec.shutdownNow();
 			}
 		}
+		this.selfFuture.cancel(true);
 		this.persistence = null;
 		this.persistenceTask = null;
 	}
@@ -559,9 +563,23 @@ public class SlotsDbFactoryImpl implements FendoDbFactory {
 			}
 		}
 	};
-
+	
 	static Path normalize(final Path path) {
 		return path.normalize();
 	}
+	
+	@Reference(
+			service=FendoInitImpl.class,
+			cardinality=ReferenceCardinality.MULTIPLE,
+			policy=ReferencePolicy.DYNAMIC,
+			policyOption=ReferencePolicyOption.GREEDY,
+			bind="addInitConfig",
+			unbind="removeInitConfig"
+	)
+	protected void addInitConfig(FendoInitImpl init) throws IOException {
+		init.init(selfFuture);
+	}
+	
+	protected void removeInitConfig(FendoInitImpl init) {} // nothing to do
 
 }
