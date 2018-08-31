@@ -30,13 +30,18 @@ import java.time.temporal.TemporalUnit;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVPrinter;
 import org.ogema.core.channelmanager.measurements.BooleanValue;
 import org.ogema.core.channelmanager.measurements.IntegerValue;
 import org.ogema.core.channelmanager.measurements.LongValue;
+import org.ogema.core.channelmanager.measurements.Quality;
 import org.ogema.core.channelmanager.measurements.SampledValue;
 import org.ogema.core.channelmanager.measurements.Value;
 import org.ogema.core.model.schedule.Schedule;
@@ -44,8 +49,11 @@ import org.ogema.core.recordeddata.RecordedData;
 import org.ogema.core.timeseries.InterpolationMode;
 import org.ogema.core.timeseries.ReadOnlyTimeSeries;
 import org.ogema.tools.timeseries.iterator.api.DataPoint;
+import org.ogema.tools.timeseries.iterator.api.MultiTimeSeriesIterator;
 import org.ogema.tools.timeseries.iterator.api.MultiTimeSeriesIteratorBuilder;
+import org.ogema.tools.timeseries.iterator.api.SampledValueDataPoint;
 import org.smartrplace.logging.fendodb.tools.config.SerializationConfiguration;
+import org.smartrplace.logging.fendodb.FendoTimeSeries;
 import org.smartrplace.logging.fendodb.tools.config.FendodbSerializationFormat;
 
 class SerializerImpl {
@@ -162,6 +170,80 @@ class SerializerImpl {
 		}
 		printEnd(writer, xmlOrJson, separator, linebreak);
 		return cnt;
+	}
+	
+	static int write(final List<FendoTimeSeries> timeSeries, final SerializationConfiguration config, final CSVPrinter printer) throws IOException {
+		if (timeSeries == null || timeSeries.isEmpty())
+			return 0;
+		final int size = timeSeries.size();
+		final Object[] record = new Object[size + 1];
+		record[0] = "ID";
+		final AtomicInteger idx = new AtomicInteger(1);
+		timeSeries.stream()
+			.map(FendoTimeSeries::getPath)
+			.forEach(ts -> record[idx.getAndIncrement()] = ts);
+		printer.printRecord(record);
+		record[0] = "Tags";
+		IntStream.range(0, size).forEach(i -> record[i+1] = "--");
+		printer.printRecord(record);
+		final List<String> tags = timeSeries.stream()
+			.flatMap(ts -> ts.getProperties().keySet().stream())
+			.distinct()
+			.collect(Collectors.toList());
+		for (String tag : tags) {
+			record[0] = tag;
+			idx.set(1);
+			for (FendoTimeSeries ts : timeSeries) {
+				final List<String> properties = ts.getProperties(tag);
+				final String values = properties == null || properties.isEmpty() ? "" 
+						: properties.stream().collect(Collectors.joining(","));
+				record[idx.getAndIncrement()] = values; 
+			}
+			printer.printRecord(record);
+		}
+		record[0] = "Timestamp";
+		IntStream.range(0, size).forEach(i -> record[i+1] = "--");
+		printer.printRecord(record);
+		
+		final long start0 = config.getStartTime();
+		final long end = config.getEndTime();
+		final DateTimeFormatter formatter = config.getFormatter();
+		final ZoneId timeZone = config.getTimeZone();
+		final Long samplingInterval = config.samplingInterval();
+		if (samplingInterval == null || samplingInterval <= 0)
+			throw new IllegalArgumentException("Illegal sampling interval " + samplingInterval + "; this should not have happened...");
+		final long start = getAlignedIntervalStartTime(null, start0, samplingInterval, timeZone);
+		final List<Iterator<SampledValue>> iterators = timeSeries.stream()
+					.map(ts -> ts.iterator(start, end))
+					.collect(Collectors.toList());
+		final MultiTimeSeriesIterator multiIt = MultiTimeSeriesIteratorBuilder.newBuilder(iterators)
+				.setGlobalInterpolationMode(InterpolationMode.LINEAR)
+				.setStepSize(start, samplingInterval)
+				.build();
+		final int maxNr = config.getMaxNrValues();
+		int cnt = 0;
+		while (multiIt.hasNext()) {
+			if (cnt++ >= maxNr) {
+				cnt--;
+				break;
+			}
+			final SampledValueDataPoint data = multiIt.next();
+			final long t = data.getTimestamp();
+			final Object time = formatter == null ? t : formatter.format(LocalDateTime.ofInstant(Instant.ofEpochMilli(t), timeZone));
+			record[0] = time;
+			for (int i=1; i <= size; i++) {
+				record[i] = getValue(data.getElement(i-1));
+			}
+			printer.printRecord(record);
+		}
+		return cnt;
+	}
+	
+	private static final Object getValue(final SampledValue sv) {
+		if (sv == null || sv.getQuality() == Quality.BAD)
+			return "";
+		final float value = sv.getValue().getFloatValue();
+		return Float.isFinite(value) ? value : "";
 	}
 	
 	private static void printHeader(final Writer writer, final String path, final Object startTime, final Object endTime, final long interval,
@@ -334,10 +416,15 @@ class SerializerImpl {
 	}
 	
 	private final static long getAlignedIntervalStartTime(ReadOnlyTimeSeries timeSeries, long startTime, long samplingInterval, final ZoneId timeZone) {
-		final SampledValue sv = timeSeries.getNextValue(startTime);
-		if (sv == null)
-			return startTime;
-		final Instant t0 = Instant.ofEpochMilli(sv.getTimestamp());
+		final Instant t0;
+		if (timeSeries != null) {
+			final SampledValue sv = timeSeries.getNextValue(startTime);
+			if (sv == null)
+				return startTime;
+			t0 = Instant.ofEpochMilli(sv.getTimestamp());
+		} else {
+			t0 = Instant.ofEpochMilli(startTime);
+		}
 		for (TemporalUnit unit :units) {
 			if (samplingInterval == unit.getDuration().toMillis()) {
 				if (!unit.isDateBased())

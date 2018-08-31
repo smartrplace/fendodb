@@ -40,7 +40,14 @@ public interface DumpConfiguration extends SerializationConfiguration {
 	boolean isRegexpExcludes();
 
 	boolean isIgnoreCaseExcludes();
-
+	
+	/**
+	 * Can only be true if {@link #samplingInterval()} is
+	 * non-null, so that all time series have a common time base.
+	 * @return
+	 */
+	boolean isWriteSingleFile();
+	
 	/**
 	 * Compress the csv files into one zip archive?
 	 * Default: false

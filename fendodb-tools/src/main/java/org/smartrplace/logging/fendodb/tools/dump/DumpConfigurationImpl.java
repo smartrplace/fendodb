@@ -37,11 +37,12 @@ class DumpConfigurationImpl implements DumpConfiguration {
 	private final boolean regexpExcludes;
 	private final boolean ignoreCaseExcludes;
 	private final boolean doZip;
+	private final boolean writeSingleFile;
 	private final TimeSeriesMatcher filter;
 	
 	DumpConfigurationImpl(SerializationConfiguration serialConfig, Collection<String> includedIds, boolean regexpIncludes,
 			boolean ignoreCaseIncludes, Collection<String> excludedIds, boolean regexpExcludes,
-			boolean ignoreCaseExcludes, boolean doZip, TimeSeriesMatcher filter) {
+			boolean ignoreCaseExcludes, boolean doZip, boolean writeSingleFile, TimeSeriesMatcher filter) {
 		this.serialConfig = Objects.requireNonNull(serialConfig);
 		this.includedIds = includedIds == null ? null : Collections.unmodifiableList(new ArrayList<>(includedIds));
 		this.regexpIncludes = regexpIncludes;
@@ -51,6 +52,7 @@ class DumpConfigurationImpl implements DumpConfiguration {
 		this.ignoreCaseExcludes = ignoreCaseExcludes;
 		this.doZip = doZip;
 		this.filter = filter;
+		this.writeSingleFile = writeSingleFile; 
 	}
 
 	@Override
@@ -141,6 +143,11 @@ class DumpConfigurationImpl implements DumpConfiguration {
 	@Override
 	public int getIndentation() {
 		return serialConfig.getIndentation();
+	}
+	
+	@Override
+	public boolean isWriteSingleFile() {
+		return writeSingleFile;
 	}
 	
 }

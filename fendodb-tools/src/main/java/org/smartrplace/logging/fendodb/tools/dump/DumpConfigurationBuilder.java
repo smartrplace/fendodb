@@ -36,6 +36,7 @@ public class DumpConfigurationBuilder {
 	private boolean regexpExcludes;
 	private boolean ignoreCaseExcludes;
 	private boolean doZip;
+	private boolean writeSingleFile;
 	private TimeSeriesMatcher filter;
 	
 	private DumpConfigurationBuilder(SerializationConfiguration serialConfig) {
@@ -73,6 +74,7 @@ public class DumpConfigurationBuilder {
 				regexpExcludes, 
 				ignoreCaseExcludes, 
 				doZip,
+				writeSingleFile,
 				filter);
 	}
 	
@@ -189,7 +191,6 @@ public class DumpConfigurationBuilder {
 		return this;
 	}
 	
-	
 	/**
 	 * If null, values are written in raw form, if non-null they are downsampled to 
 	 * the respective interval (in ms). Default is null.
@@ -199,6 +200,25 @@ public class DumpConfigurationBuilder {
 	 */
 	public DumpConfigurationBuilder setSamplingInterval(Long samplingInterval) {
 		serialConfig.setSamplingInterval(samplingInterval);
+		if (samplingInterval == null)
+			writeSingleFile = false;
+		return this;
+	}
+	
+	/**
+	 * If null, values are written in raw form, if non-null they are downsampled to 
+	 * the respective interval (in ms). Default is null.
+	 * @param samplingInterval
+	 * @param writeSingleFile
+	 * @return
+	 * @throws IllegalArgumentException if samplingInterval is non-positive, or samplingInterval is null
+	 * 		and at the same time writeSingleFile is true.
+	 */
+	public DumpConfigurationBuilder setSamplingInterval(Long samplingInterval, boolean writeSingleFile) {
+		if (samplingInterval == null && writeSingleFile) 
+			throw new IllegalArgumentException("writeSingleFile must be false if samplingInterval is null");
+		serialConfig.setSamplingInterval(samplingInterval);
+		this.writeSingleFile = writeSingleFile;
 		return this;
 	}
 	

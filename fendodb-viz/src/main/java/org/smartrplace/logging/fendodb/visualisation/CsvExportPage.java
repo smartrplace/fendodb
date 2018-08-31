@@ -109,6 +109,7 @@ public class CsvExportPage implements LazyWidgetPage {
 		private final Button nrDatapointsTrigger;
 		private final Download download;
 		private final Button downloadTrigger;
+		private static final String SINGLE_FILE_PROP = "singlefile";
 		private static final String DATES_FIXED_PROP = "datesfixed";
 		private static final String ALIGN_TIMESTAMPS_PROP = "aligntimestamps";
 	
@@ -250,10 +251,18 @@ public class CsvExportPage implements LazyWidgetPage {
 			};
 			this.startPicker = new CsvStartEndPicker(page, "startPicker", true);
 			this.endPicker = new CsvStartEndPicker(page, "endPicker", false);
-			this.options = new Checkbox2(page, "optionsCheck");
+			this.options = new Checkbox2(page, "optionsCheck") {
+				
+				public void onGET(OgemaHttpRequest req) {
+					if (!isChecked(ALIGN_TIMESTAMPS_PROP, req))
+						setState(SINGLE_FILE_PROP, false, req);
+				}
+				
+			};
 			options.setDefaultCheckboxList(Arrays.asList(
+					new DefaultCheckboxEntry(SINGLE_FILE_PROP, "Write to single file", true),
 					new DefaultCheckboxEntry(DATES_FIXED_PROP, "Fix interval on schedule change", false),
-					new DefaultCheckboxEntry(ALIGN_TIMESTAMPS_PROP, "Align timestamps (equidistant)?", false)
+					new DefaultCheckboxEntry(ALIGN_TIMESTAMPS_PROP, "Align timestamps (equidistant)?", true)
 			));
 			this.samplingInterval = new ValueInputField<Long>(page, "samplingInterval", Long.class) {
 				
@@ -265,7 +274,7 @@ public class CsvExportPage implements LazyWidgetPage {
 				}
 				
 			};
-			samplingInterval.setDefaultNumericalValue(1L);
+			samplingInterval.setDefaultNumericalValue(15L);
 			samplingInterval.setDefaultLowerBound(1);
 			this.samplingUnitSelector = new EnumDropdown<TimeUnit>(page, "samplingUnitSelector", TimeUnit.class) {
 				
@@ -313,7 +322,7 @@ public class CsvExportPage implements LazyWidgetPage {
 						if (itv != null) {
 							final TimeUnit unit = samplingUnitSelector.getSelectedItem(req);
 							itv = TimeUnit.MILLISECONDS.convert(itv, unit);
-							configBuilder.setSamplingInterval(itv);
+							configBuilder.setSamplingInterval(itv, options.isChecked(SINGLE_FILE_PROP, req));
 						}
 					}
 					final DumpConfiguration configuration = configBuilder.build();
@@ -327,6 +336,7 @@ public class CsvExportPage implements LazyWidgetPage {
 						download.setSource(output -> {
 							try {
 								FendoDbTools.zippedDump(instance, output, configuration);
+//								FendoDbTools.dump(instance, output, configuration);
 							} catch (IOException e) {
 								LoggerFactory.getLogger(getClass()).warn("Failed to zip db: ",e);
 							}
@@ -387,6 +397,7 @@ public class CsvExportPage implements LazyWidgetPage {
 			options.triggerAction(samplingInterval, TriggeringAction.POST_REQUEST, TriggeredAction.GET_REQUEST);
 			options.triggerAction(samplingUnitSelector, TriggeringAction.POST_REQUEST, TriggeredAction.GET_REQUEST);
 			options.triggerAction(nrDatapoints, TriggeringAction.POST_REQUEST, TriggeredAction.GET_REQUEST);
+			options.triggerAction(options, TriggeringAction.POST_REQUEST, TriggeredAction.GET_REQUEST);
 			
 			seriesSelector.triggerAction(startPicker, TriggeringAction.GET_REQUEST, TriggeredAction.GET_REQUEST);
 			seriesSelector.triggerAction(startPicker, TriggeringAction.POST_REQUEST, TriggeredAction.GET_REQUEST);

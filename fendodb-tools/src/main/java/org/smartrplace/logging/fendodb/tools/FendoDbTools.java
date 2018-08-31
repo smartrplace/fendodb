@@ -104,6 +104,35 @@ public class FendoDbTools {
 	}
 	
 	/**
+	 * Create a database dump of the provided SlotsDb instance.
+	 * @param instance
+	 * @param output
+	 * @param configuration
+	 * @throws IOException 
+	 * @throws IllegalStateException
+	 * 		if the passed path exists and is not an empty directory
+	 * @throws NullPointerException 
+	 * 		if instance or out are null
+	 * @throws SecurityException
+	 *  	if Java security is active, and the caller does not have the appropriate {@link FendoDbPermission#ADMIN admin permission}.
+	 */
+	public static void dump(final CloseableDataRecorder instance, final OutputStream output, DumpConfiguration configuration) throws IOException {
+		Objects.requireNonNull(instance);
+		Objects.requireNonNull(output);
+		if (configuration == null)
+			configuration = DumpConfigurationBuilder.getInstance()
+				.setMaxNrValues(Integer.MAX_VALUE)
+				.build(); // default config
+		final Lock lock = instance.getDbLock();
+		lock.lock();
+		try {
+			DumpImpl.dump(instance, output, configuration);
+		} finally {
+			lock.unlock();
+		}
+	}
+	
+	/**
 	 * Create a CSV dump of the database, zip it, and write it to the output stream.
 	 * If the output stream corresponds to a file, then this is equivalent to 
 	 * {@link #dump(CloseableDataRecorder, Path, DumpConfiguration)}
