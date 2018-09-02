@@ -88,6 +88,7 @@ public class RecordedDataServlet extends HttpServlet {
     @Reference
     private FendoDbFactory factory;
 
+    // note: accessed reflectively in tests, do not refactor
     @Reference(service=StatisticsService.class)
     private ComponentServiceObjects<StatisticsService> statisticsService;
 

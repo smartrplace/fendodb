@@ -47,6 +47,7 @@ import org.ogema.core.recordeddata.RecordedDataConfiguration;
 import org.ogema.core.recordeddata.RecordedDataConfiguration.StorageType;
 import org.ogema.recordeddata.DataRecorderException;
 import org.osgi.framework.BundleContext;
+import org.osgi.service.component.ComponentServiceObjects;
 import org.smartrplace.logging.fendodb.CloseableDataRecorder;
 import org.smartrplace.logging.fendodb.FendoDbFactory;
 import org.smartrplace.logging.fendodb.FendoTimeSeries;
@@ -90,9 +91,11 @@ public class RestTest {
 		f.set(servlet, factory);
 		
 		final StatisticsService stats = new StatisticsServiceImpl();
-		final Field f2 = RecordedDataServlet.class.getDeclaredField("statistics");
+		final ComponentServiceObjects<StatisticsService> serviceWrapper = mock(ComponentServiceObjects.class);
+		when(serviceWrapper.getService()).thenReturn(stats);
+		final Field f2 = RecordedDataServlet.class.getDeclaredField("statisticsService");
 		f2.setAccessible(true);
-		f2.set(servlet, stats);
+		f2.set(servlet, serviceWrapper);
 		
 		return servlet;
 	}

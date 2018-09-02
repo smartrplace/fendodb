@@ -53,28 +53,17 @@ class DumpImpl {
 	static void dump(final CloseableDataRecorder instance, final Path path, final DumpConfiguration config) throws IOException {
 		final Stream<FendoTimeSeries> timeSeriesStream = getTimeSeries(instance, config);
 		try {
-			if (config.doZip()) { // TODO support writeSingleFile as well
+			if (config.doZip()) {
 				try (final OutputStream out = new BufferedOutputStream(Files.newOutputStream(path))) {
-					zip(timeSeriesStream, config, out);
+					zip(instance, timeSeriesStream, config, out);
 				}
 			} else if (!config.isWriteSingleFile()) {
 				Files.createDirectories(path);
 				timeSeriesStream.forEach(ts -> write(path, ts, config));
 			} else {
 				Files.createDirectories(path);
-				final StringBuilder sb = new StringBuilder();
-				sb.append(instance.getPath().getFileName()).append('_');
-				final long t = System.currentTimeMillis();
-				DateTimeFormatter formatter = config.getFormatter();
-				ZoneId zone = config.getTimeZone();
-				if (formatter == null)
-					formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH_mm", Locale.ENGLISH);
-				if (zone == null)
-					zone = ZoneId.systemDefault();
-				sb.append(formatter.format(ZonedDateTime.ofInstant(Instant.ofEpochMilli(t), zone)));
 				final List<FendoTimeSeries> list = timeSeriesStream.collect(Collectors.toList());
-				write(path, list, sb.toString(), config);
-				throw new UnsupportedOperationException("writeSingleFile not implemented yet"); // TODO
+				write(path, list, getFilename(instance, config), config);
 			}
 		} catch (UncheckedIOException e) {
 			throw e.getCause();
@@ -85,7 +74,7 @@ class DumpImpl {
 		final Stream<FendoTimeSeries> timeSeriesStream = getTimeSeries(instance, config);
 		try {
 			if (config.doZip()) {
-				zip(timeSeriesStream, config, output);
+				zip(instance, timeSeriesStream, config, output);
 			} else {
 				final StringBuilder sb = new StringBuilder();
 				sb.append(instance.getPath().getFileName()).append('_');
@@ -108,27 +97,42 @@ class DumpImpl {
 	static void zip(final CloseableDataRecorder instance, final OutputStream out, final DumpConfiguration config) throws IOException {
 		final Stream<FendoTimeSeries> timeSeriesStream = getTimeSeries(instance, config);
 		try {
-			zip(timeSeriesStream, config, out);
+			zip(instance, timeSeriesStream, config, out);
 		} catch (UncheckedIOException e) {
 			throw e.getCause();
 		}
 	}
 
-	private static void zip(final Stream<FendoTimeSeries> stream, final DumpConfiguration config, final OutputStream out) throws IOException {
+	private static void zip(final CloseableDataRecorder instance, final Stream<FendoTimeSeries> stream, 
+			final DumpConfiguration config, final OutputStream out) throws IOException {
 		final char delimiter = config.getDelimiter();
 		final CSVFormat format = CSVFormat.newFormat(delimiter).withTrailingDelimiter(false).withRecordSeparator('\n');
-		try (final ZipOutputStream zout = new ZipOutputStream(out, StandardCharsets.UTF_8);) {
- 			stream.forEach(ts -> {
+		try (final ZipOutputStream zout = new ZipOutputStream(out, StandardCharsets.UTF_8)) {
+			if (config.isWriteSingleFile()) {
 				try {
-					final ZipEntry entry = new ZipEntry(URLEncoder.encode(ts.getPath() + ".csv", StandardCharsets.UTF_8.toString()));
+					final ZipEntry entry = new ZipEntry(URLEncoder.encode(getFilename(instance, config), StandardCharsets.UTF_8.toString()));
 					zout.putNextEntry(entry);
-					final CSVPrinter printer = new CSVPrinter(new OutputStreamWriter(zout, StandardCharsets.UTF_8), format);
-					SerializerImpl.write(ts, config, printer);
-					printer.flush();
+					try (final CSVPrinter printer = new CSVPrinter(new OutputStreamWriter(zout, StandardCharsets.UTF_8), format)) {
+						SerializerImpl.write(stream.collect(Collectors.toList()), config, printer);
+						printer.flush();
+					}
 				} catch (IOException e) {
 					throw new UncheckedIOException(e);
 				}
-			});
+			} else {
+	 			stream.forEach(ts -> {
+					try {
+						final ZipEntry entry = new ZipEntry(URLEncoder.encode(ts.getPath() + ".csv", StandardCharsets.UTF_8.toString()));
+						zout.putNextEntry(entry);
+						// note: must not close this printer, would lead to error on next entry
+						final CSVPrinter printer = new CSVPrinter(new OutputStreamWriter(zout, StandardCharsets.UTF_8), format);
+						SerializerImpl.write(ts, config, printer);
+						printer.flush();
+					} catch (IOException e) {
+						throw new UncheckedIOException(e);
+					}
+				});
+			}
 		}
 	}
 
@@ -177,7 +181,6 @@ class DumpImpl {
 		final char delimiter = config.getDelimiter();
 		// TODO implement JSON and XML serialization
 		final CSVFormat format = CSVFormat.newFormat(delimiter).withTrailingDelimiter(false).withRecordSeparator('\n');
-		System.out.println("Writing time series " + timeSeries.getPath());
 		try (final BufferedWriter writer = Files.newBufferedWriter(target); final CSVPrinter printer = new CSVPrinter(writer, format);) {
 			SerializerImpl.write(timeSeries, config, printer);
 		} catch (IOException e) {
@@ -214,6 +217,27 @@ class DumpImpl {
 			throw new UncheckedIOException(e);
 		}
 		
+	}
+	
+	/**
+	 * Get the filename for a single file containing multiple time series
+	 * @param instance
+	 * @param config
+	 * @return
+	 */
+	private static final String getFilename(final CloseableDataRecorder instance, final DumpConfiguration config) {
+		final StringBuilder sb = new StringBuilder();
+		sb.append(instance.getPath().getFileName()).append('_');
+		final long t = System.currentTimeMillis();
+		DateTimeFormatter formatter = config.getFormatter();
+		ZoneId zone = config.getTimeZone();
+		if (formatter == null)
+			formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH_mm", Locale.ENGLISH);
+		if (zone == null)
+			zone = ZoneId.systemDefault();
+		sb.append(formatter.format(ZonedDateTime.ofInstant(Instant.ofEpochMilli(t), zone)));
+		sb.append(".csv");
+		return sb.toString();
 	}
 	
 

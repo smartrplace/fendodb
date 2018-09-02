@@ -116,6 +116,7 @@ public class CsvExportPage implements LazyWidgetPage {
 		@SuppressWarnings("serial")
 		CsvExportPageInit(final WidgetPage<?> page, final FendoDbFactory factory, final ApplicationManager am) {
 			this.page = page;
+			page.setTitle("FendoDB CSV export");
 			this.header = new Header(page, "header", "CSV export");
 			header.addDefaultStyle(WidgetData.TEXT_ALIGNMENT_LEFT);
 			header.setDefaultColor("blue");
@@ -351,6 +352,7 @@ public class CsvExportPage implements LazyWidgetPage {
 				}
 				
 			};
+			downloadTrigger.addDefaultStyle(ButtonData.BOOTSTRAP_BLUE);
 			buildPage();
 			setDependencies();
 		}

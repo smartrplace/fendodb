@@ -24,7 +24,6 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 import org.ogema.core.application.ApplicationManager;
-import org.osgi.service.component.annotations.Activate;
 import org.osgi.service.component.annotations.Component;
 import org.osgi.service.component.annotations.Reference;
 import org.smartrplace.logging.fendodb.CloseableDataRecorder;
@@ -83,6 +82,7 @@ public class FendoPage2 implements LazyWidgetPage {
 		@SuppressWarnings("serial")
 		FendoPage2Init(final WidgetPage<?> page, final FendoDbFactory factory, final ApplicationManager am) {
 			this.page = page;
+			page.setTitle("FendoDB visualisation");
 			this.header = new Header(page, "header", "FendoDB visualization");
 			header.addDefaultStyle(WidgetData.TEXT_ALIGNMENT_LEFT);
 			header.setDefaultColor("blue");

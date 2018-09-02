@@ -135,6 +135,7 @@ public class FendoDbOverviewPage implements LazyWidgetPage {
 		@SuppressWarnings({ "serial", "deprecation" })
 		FendoDbOverviewPageInit(final WidgetPage<?> page, final FendoDbFactory factory) {
 			this.page = page;
+			page.setTitle("FendoDB overview");
 			this.header = new Header(page, "header", true);
 			header.setDefaultText("FendoDB overview");
 			header.setDefaultColor("blue");

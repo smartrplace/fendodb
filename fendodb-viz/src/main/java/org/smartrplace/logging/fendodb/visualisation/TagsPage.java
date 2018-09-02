@@ -93,7 +93,7 @@ public class TagsPage implements LazyWidgetPage {
 		@SuppressWarnings("serial")
 		TagsPageInit(final WidgetPage<?> page, final FendoDbFactory factory) {
 			this.page = page;
-	
+			page.setTitle("FendoDB tags");
 			this.header = new Header(page, "header", "FendoDB tags");
 			header.addDefaultStyle(WidgetData.TEXT_ALIGNMENT_CENTERED);
 			header.setDefaultColor("blue");
