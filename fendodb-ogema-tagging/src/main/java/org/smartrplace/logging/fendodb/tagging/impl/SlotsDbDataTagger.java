@@ -25,22 +25,20 @@ import java.util.Hashtable;
 import java.util.List;
 import java.util.Map;
 
-import org.apache.felix.scr.annotations.Component;
-import org.apache.felix.scr.annotations.Reference;
-import org.apache.felix.scr.annotations.Service;
 import org.ogema.core.application.Application;
 import org.ogema.core.application.ApplicationManager;
 import org.ogema.core.model.Resource;
 import org.ogema.core.resourcemanager.ResourceAccess;
 import org.osgi.framework.BundleContext;
 import org.osgi.framework.ServiceRegistration;
+import org.osgi.service.component.annotations.Component;
+import org.osgi.service.component.annotations.Reference;
 import org.smartrplace.logging.fendodb.CloseableDataRecorder;
 import org.smartrplace.logging.fendodb.DataRecorderReference;
 import org.smartrplace.logging.fendodb.FendoDbFactory;
 import org.smartrplace.logging.fendodb.tagging.api.TaggingUtils;
 
-@Service(Application.class)
-@Component
+@Component(service=Application.class)
 public class SlotsDbDataTagger implements Application, FendoDbFactory.SlotsDbListener {
 
 	private volatile ApplicationManager appManager;
@@ -48,7 +46,8 @@ public class SlotsDbDataTagger implements Application, FendoDbFactory.SlotsDbLis
 	private ServiceRegistration<?> shellCommands;
 	private AutoCloseable continuousTagger;
 
-	@Reference FendoDbFactory factory;
+	@Reference 
+	FendoDbFactory factory;
 
 	@Override
 	public void start(ApplicationManager appManager) {

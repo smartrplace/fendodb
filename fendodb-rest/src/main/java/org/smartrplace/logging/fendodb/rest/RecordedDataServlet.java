@@ -63,13 +63,18 @@ import org.smartrplace.logging.fendodb.tools.config.FendodbSerializationFormat;
 // TODO POST value triggers info tasks -> ?
 @Component(
 	service=Servlet.class,
-	property=HttpWhiteboardConstants.HTTP_WHITEBOARD_SERVLET_PATTERN + "=" + RecordedDataServlet.ALIAS
+	property= { 
+			HttpWhiteboardConstants.HTTP_WHITEBOARD_SERVLET_PATTERN + "=/*", // prefix to be set in ServletContextHelper
+			HttpWhiteboardConstants.HTTP_WHITEBOARD_CONTEXT_SELECT + "=" + RecordedDataServlet.CONTEXT_FILTER
+	}
 )
 public class RecordedDataServlet extends HttpServlet {
 
 //	private static final Logger logger = LoggerFactory.getLogger(RecordedDataServlet.class);
     private static final long serialVersionUID = 1L;
-    static final String ALIAS = "/rest/fendodb";
+    public static final String CONTEXT = "org.smartrplace.logging.fendodb.rest";
+    public static final String CONTEXT_FILTER = 
+    		"(" + HttpWhiteboardConstants.HTTP_WHITEBOARD_CONTEXT_NAME + "=" + CONTEXT + ")";
 
     private final static String[] JSON_FORMATS = {
     	"application/json",

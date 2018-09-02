@@ -4,13 +4,11 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
-import org.apache.felix.scr.annotations.Activate;
-import org.apache.felix.scr.annotations.Component;
-import org.apache.felix.scr.annotations.Deactivate;
-import org.apache.felix.scr.annotations.Property;
-import org.apache.felix.scr.annotations.Reference;
-import org.apache.felix.scr.annotations.Service;
 import org.ogema.core.timeseries.ReadOnlyTimeSeries;
+import org.osgi.service.component.annotations.Activate;
+import org.osgi.service.component.annotations.Component;
+import org.osgi.service.component.annotations.Deactivate;
+import org.osgi.service.component.annotations.Reference;
 import org.smartrplace.logging.fendodb.FendoDbFactory;
 import org.smartrplace.logging.fendodb.FendoTimeSeries;
 
@@ -25,9 +23,10 @@ import de.iwes.timeseries.eval.api.TimeSeriesData;
 import de.iwes.timeseries.eval.base.provider.utils.EvaluationInputImpl;
 import de.iwes.timeseries.eval.base.provider.utils.TimeSeriesDataImpl;
 
-@Service(DataProvider.class)
-@Property(name="provider-id", value=FendoDbSource.ID)
-@Component
+@Component(
+		service=DataProvider.class,
+		property="provider-id=" + FendoDbSource.ID
+)
 public class FendoDbSource implements DataProvider<FendoTimeSeries> {
 	
 	final static String ID = "fendodbProvider";

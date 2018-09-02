@@ -24,14 +24,13 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
-import org.apache.felix.scr.annotations.Component;
-import org.apache.felix.scr.annotations.Reference;
-import org.apache.felix.scr.annotations.ReferenceCardinality;
-import org.apache.felix.scr.annotations.ReferencePolicy;
-import org.apache.felix.scr.annotations.Service;
 import org.ogema.core.channelmanager.measurements.SampledValue;
 import org.ogema.core.timeseries.InterpolationMode;
 import org.ogema.core.timeseries.ReadOnlyTimeSeries;
+import org.osgi.service.component.annotations.Component;
+import org.osgi.service.component.annotations.Reference;
+import org.osgi.service.component.annotations.ReferenceCardinality;
+import org.osgi.service.component.annotations.ReferencePolicy;
 import org.slf4j.LoggerFactory;
 import org.smartrplace.logging.fendodb.stats.Statistics;
 import org.smartrplace.logging.fendodb.stats.StatisticsConfiguration;
@@ -39,15 +38,7 @@ import org.smartrplace.logging.fendodb.stats.StatisticsProvider;
 import org.smartrplace.logging.fendodb.stats.StatisticsService;
 import org.smartrplace.logging.fendodb.stats.samples.BasicProviders;
 
-@Reference(
-		referenceInterface=StatisticsProvider.class,
-		bind="addProvider",
-		unbind="removeProvider",
-		cardinality=ReferenceCardinality.OPTIONAL_MULTIPLE,
-		policy=ReferencePolicy.DYNAMIC
-)
-@Component
-@Service(StatisticsService.class)
+@Component(service=StatisticsService.class)
 public class StatisticsServiceImpl implements StatisticsService {
 	
 	private final Map<String, StatisticsProvider<?>> statistic = new ConcurrentHashMap<>();
@@ -56,6 +47,13 @@ public class StatisticsServiceImpl implements StatisticsService {
 		statistic.putAll(BasicProviders.getBasicProviders());
 	}
 	
+	@Reference(
+			service=StatisticsProvider.class,
+			bind="addProvider",
+			unbind="removeProvider",
+			cardinality=ReferenceCardinality.MULTIPLE,
+			policy=ReferencePolicy.DYNAMIC
+	)
 	protected void addProvider(StatisticsProvider<?> provider, Map<String, Object> props) {
 		final Object o = props.get("providerId");
 		if (!(o instanceof String))
