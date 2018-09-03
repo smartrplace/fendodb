@@ -36,6 +36,7 @@ import org.smartrplace.logging.fendodb.DataRecorderReference;
 import org.smartrplace.logging.fendodb.FendoDbConfiguration;
 import org.smartrplace.logging.fendodb.FendoDbConfigurationBuilder;
 import org.smartrplace.logging.fendodb.FendoTimeSeries;
+import org.smartrplace.logging.fendodb.accesscontrol.FendoDbAccessControl;
 import org.smartrplace.logging.fendodb.permissions.FendoDbPermission;
 import org.smartrplace.logging.fendodb.search.TimeSeriesMatcher;
 
@@ -48,13 +49,16 @@ class SlotsDbProxy implements CloseableDataRecorder {
 	private final boolean hasWritePermission;
 	private final boolean hasAdminPermission;
 	private final FendoDbConfiguration config;
+	private final FendoDbAccessControl accessManager;
 	private final AtomicBoolean closed = new AtomicBoolean(false);
 
 	SlotsDbProxy(SlotsDb master, boolean readOnly) {
 		this.master = master;
+		final SlotsDbFactoryImpl factory = master.getFactory();
+		this.accessManager = factory == null ? null : factory.accessManager;
 		this.hasWritePermission = !readOnly && !master.getConfiguration().isReadOnlyMode() &&
-				(!master.secure || PermissionUtils.mayWrite(master.getPath()));
-		this.hasAdminPermission = !master.secure || PermissionUtils.hasAdminPermission(master.getPath());
+				(!master.secure || PermissionUtils.mayWrite(master.getPath(), accessManager));
+		this.hasAdminPermission = !master.secure || PermissionUtils.hasAdminPermission(master.getPath(), accessManager);
 		final FendoDbConfiguration cfg = master.getConfiguration();
 		this.config = FendoDbConfigurationBuilder.getInstance(cfg)
 				.setReadOnlyMode(readOnly)
@@ -131,8 +135,8 @@ class SlotsDbProxy implements CloseableDataRecorder {
 	@Override
 	public DataRecorderReference copy(Path target, FendoDbConfiguration configuration) throws IOException {
 		if (master.secure) {
-			PermissionUtils.checkPermission(target, FendoDbPermission.ADMIN);
-			PermissionUtils.checkWritePermission(target);
+			PermissionUtils.checkPermission(target, FendoDbPermission.ADMIN, accessManager);
+			PermissionUtils.checkWritePermission(target, accessManager);
 		}
 		return master.copy(target, configuration);
 	}
@@ -147,8 +151,8 @@ class SlotsDbProxy implements CloseableDataRecorder {
 	public DataRecorderReference copy(Path target, FendoDbConfiguration configuration, TimeSeriesMatcher filter,
 			long startTime, long endTime) throws IOException {
 		if (master.secure) {
-			PermissionUtils.checkPermission(target, FendoDbPermission.ADMIN);
-			PermissionUtils.checkWritePermission(target);
+			PermissionUtils.checkPermission(target, FendoDbPermission.ADMIN, accessManager);
+			PermissionUtils.checkWritePermission(target, accessManager);
 		}
 		return master.copy(target, configuration, filter, startTime, endTime);
 	}

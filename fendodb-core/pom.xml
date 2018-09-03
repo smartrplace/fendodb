@@ -25,6 +25,11 @@
 		</dependency>
 		<dependency>
 			<groupId>org.smartrplace.logging</groupId>
+			<artifactId>fendodb-admin-api</artifactId>
+			<version>${project.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>org.smartrplace.logging</groupId>
 			<artifactId>fendodb-api</artifactId>
 		</dependency>
 		<dependency>
@@ -59,8 +64,9 @@
                     	<!-- exporting the API packages from another jar means they will be included in this bundle -->
                     	<Export-Package>
                     		org.smartrplace.logging.fendodb,
-                    		org.smartrplace.logging.fendodb.search,
+                    		org.smartrplace.logging.fendodb.accesscontrol,
                     		org.smartrplace.logging.fendodb.permissions,
+                    		org.smartrplace.logging.fendodb.search,
                     		org.smartrplace.logging.fendodb.stats,
                     		org.smartrplace.logging.fendodb.stats.samples
                     	</Export-Package>

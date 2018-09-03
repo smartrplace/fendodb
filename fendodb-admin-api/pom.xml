@@ -9,24 +9,16 @@
 	    <version>0.0.4-SNAPSHOT</version>
     </parent>
 
-	<artifactId>fendodb-api</artifactId>
-	<name>SlotsDB timeseries database API</name>
+	<artifactId>fendodb-admin-api</artifactId>
+	<name>FendoDB timeseries database admin API</name>
 
 	<packaging>jar</packaging>
 
 	<dependencies>
+	<!--required?-->
 		<dependency>
 			<groupId>org.osgi</groupId>
 			<artifactId>osgi.core</artifactId>
-		</dependency>
-		<dependency>
-			<groupId>org.ogema.core</groupId>
-			<artifactId>api</artifactId>
-		</dependency>
-		<dependency>
-			<groupId>org.ogema.ref-impl</groupId>
-			<artifactId>internal-api</artifactId>
-			<version>${ogema.api.version}</version>
 		</dependency>
 	</dependencies>
 

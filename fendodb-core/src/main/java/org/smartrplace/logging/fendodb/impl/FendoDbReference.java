@@ -24,6 +24,7 @@ import java.util.Objects;
 import org.smartrplace.logging.fendodb.CloseableDataRecorder;
 import org.smartrplace.logging.fendodb.DataRecorderReference;
 import org.smartrplace.logging.fendodb.FendoDbConfiguration;
+import org.smartrplace.logging.fendodb.accesscontrol.FendoDbAccessControl;
 
 class FendoDbReference implements DataRecorderReference {
 
@@ -61,7 +62,9 @@ class FendoDbReference implements DataRecorderReference {
 		boolean cfgReadOnly = (configuration != null && configuration.isReadOnlyMode())
 				|| (configuration == null && master.getConfiguration().isReadOnlyMode());
 		if (!cfgReadOnly && this.isSecure) {
-			cfgReadOnly = !PermissionUtils.mayWrite(master.getPath());
+			final SlotsDbFactoryImpl factory = master.getFactory();
+			final FendoDbAccessControl accessControl = factory == null ? null : factory.accessManager;
+			cfgReadOnly = !PermissionUtils.mayWrite(master.getPath(), accessControl);
 			if (cfgReadOnly && configuration != null && !configuration.isReadOnlyMode())
 				throw new AccessControlException("Write access to database not permitted");
 		}

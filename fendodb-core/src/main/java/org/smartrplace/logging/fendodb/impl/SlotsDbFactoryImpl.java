@@ -63,6 +63,7 @@ import org.smartrplace.logging.fendodb.CloseableDataRecorder;
 import org.smartrplace.logging.fendodb.DataRecorderReference;
 import org.smartrplace.logging.fendodb.FendoDbConfiguration;
 import org.smartrplace.logging.fendodb.FendoDbFactory;
+import org.smartrplace.logging.fendodb.accesscontrol.FendoDbAccessControl;
 import org.smartrplace.logging.fendodb.permissions.FendoDbPermission;
 
 @Component(immediate=true, service=FendoDbFactory.class)
@@ -90,6 +91,14 @@ public class SlotsDbFactoryImpl implements FendoDbFactory {
 
 	@Reference(cardinality=ReferenceCardinality.OPTIONAL)
 	private FrameworkClock clock;
+	
+	@Reference(
+			service=FendoDbAccessControl.class,
+			cardinality=ReferenceCardinality.OPTIONAL,
+			policy=ReferencePolicy.DYNAMIC,
+			policyOption=ReferencePolicyOption.GREEDY
+	)
+	volatile FendoDbAccessControl accessManager;
 
 	// ctx is null in tests... must be able to deal with this case
 	@SuppressWarnings("unchecked")
@@ -286,20 +295,20 @@ public class SlotsDbFactoryImpl implements FendoDbFactory {
 					return null;
 				boolean configUpdate = configuration != null && !configuration.isReadOnlyMode();
 				if (isSecure) {
-					PermissionUtils.checkPermission(baseFolder, FendoDbPermission.READ);
-					configUpdate = configUpdate && PermissionUtils.mayWrite(baseFolder);
+					PermissionUtils.checkPermission(baseFolder, FendoDbPermission.READ, accessManager);
+					configUpdate = configUpdate && PermissionUtils.mayWrite(baseFolder, accessManager);
 				}
 				db = new SlotsDb(baseFolder, clock, configuration, this, configUpdate);
 				instances.put(baseFolder, db); // would be added in listener callback too, but better add it here already, to avoid race conditions
 			}
 			try {
 				final boolean readOnly = (configuration != null && configuration.isReadOnlyMode())
-						|| (configuration == null && isSecure && !PermissionUtils.mayWrite(baseFolder));
+						|| (configuration == null && isSecure && !PermissionUtils.mayWrite(baseFolder, accessManager));
 				if (isSecure && !readOnly)
-					PermissionUtils.checkWritePermission(baseFolder);
+					PermissionUtils.checkWritePermission(baseFolder, accessManager);
 				// otherwise admin permission has been checked already
 				if (exists && isSecure) {
-					PermissionUtils.checkReadPermission(baseFolder);
+					PermissionUtils.checkReadPermission(baseFolder, accessManager);
 				}
 				closedInstances.remove(baseFolder);
 				if (!exists)
@@ -395,13 +404,13 @@ public class SlotsDbFactoryImpl implements FendoDbFactory {
 		else {
 			final Map<Path, DataRecorderReference> map = new HashMap<>(instances.size());
 			for (Map.Entry<Path, SlotsDb> entry : instances.entrySet()) {
-				if (!isSecure || PermissionUtils.mayRead(entry.getKey())) // write permission will be determined by proxy
+				if (!isSecure || PermissionUtils.mayRead(entry.getKey(), accessManager)) // write permission will be determined by proxy
 					map.put(entry.getKey(), new FendoDbReference(entry.getValue(), isSecure));
 			}
 			if (!closedInstances.isEmpty()) {
 				synchronized (instances) {
 					for (Path closed: closedInstances) {
-						if (isSecure && !PermissionUtils.mayRead(closed))
+						if (isSecure && !PermissionUtils.mayRead(closed, accessManager))
 							continue;
 						try {
 							final SlotsDb slotsDb = new SlotsDb(closed, clock, null, this);
@@ -422,7 +431,7 @@ public class SlotsDbFactoryImpl implements FendoDbFactory {
 		if (closed.get())
 			throw new IllegalStateException("SlotsFactory has been closed");
 		if (isSecure)
-			PermissionUtils.checkReadPermission(baseFolder);
+			PermissionUtils.checkReadPermission(baseFolder, accessManager);
 		baseFolder = normalize(BASE.resolve(baseFolder));
 		SlotsDb db = getSlotsDb(baseFolder);
 		if (db != null)
@@ -443,7 +452,7 @@ public class SlotsDbFactoryImpl implements FendoDbFactory {
 		if (closed.get())
 			throw new IllegalStateException("SlotsFactory has been closed");
 		if (isSecure)
-			PermissionUtils.checkReadPermission(baseFolder);
+			PermissionUtils.checkReadPermission(baseFolder, accessManager);
 		baseFolder = normalize(BASE.resolve(baseFolder));
 		SlotsDb db = getSlotsDb(baseFolder);
 		if (db != null)
@@ -581,5 +590,5 @@ public class SlotsDbFactoryImpl implements FendoDbFactory {
 	}
 	
 	protected void removeInitConfig(FendoInitImpl init) {} // nothing to do
-
+	
 }

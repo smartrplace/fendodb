@@ -64,6 +64,12 @@
 		</dependency>
 		<dependency>
 			<groupId>org.smartrplace.logging</groupId>
+			<artifactId>fendodb-admin-api</artifactId>
+			<version>${project.version}</version>
+		</dependency>
+		<!-- compile time only dependency -->
+		<dependency>
+			<groupId>org.smartrplace.logging</groupId>
 			<artifactId>fendodb-rest</artifactId>
 			<version>${project.version}</version>
 		</dependency>
@@ -113,7 +119,6 @@
 		<dependency>
 			<groupId>javax.servlet</groupId>
 			<artifactId>javax.servlet-api</artifactId>
-			<version>3.1.0</version>
 			<scope>test</scope>
 		</dependency>
 		<dependency>

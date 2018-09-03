@@ -55,9 +55,9 @@
 		<felix.service.command.version.max>2.0.0</felix.service.command.version.max>
 	</properties>
 	<modules>
+		<module>fendodb-admin-api</module>
 		<module>fendodb-api</module>
 		<module>fendodb-core</module>
-		<module>fendodb-ogema-admin</module>
 		<module>fendodb-ogema-context</module>
 		<module>fendodb-ogema-tagging</module>
 		<module>fendodb-reader</module>

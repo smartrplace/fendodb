@@ -362,7 +362,7 @@ public class RecordedDataServlet extends HttpServlet {
     protected void doGet(final HttpServletRequest req, final HttpServletResponse resp) throws ServletException, IOException {
     	final String databasePath = req.getParameter(Parameters.PARAM_DB);
     	resp.setCharacterEncoding("UTF-8");
-    	 final FendodbSerializationFormat format = getFormat(req, true);
+    	final FendodbSerializationFormat format = getFormat(req, true);
     	if (databasePath == null || databasePath.trim().isEmpty()) {
     		outputDatabaseInstances(resp, getFormat(req, true));
     		setContent(resp, format);

@@ -31,6 +31,7 @@ import org.osgi.service.component.annotations.Component;
 import org.osgi.service.component.annotations.Reference;
 import org.osgi.service.http.context.ServletContextHelper;
 import org.osgi.service.http.whiteboard.HttpWhiteboardConstants;
+import org.smartrplace.logging.fendodb.accesscontrol.FendoDbAccessControl;
 import org.smartrplace.logging.fendodb.permissions.FendoDbPermission;
 import org.smartrplace.logging.fendodb.rest.RecordedDataServlet;
 
@@ -43,6 +44,8 @@ import org.smartrplace.logging.fendodb.rest.RecordedDataServlet;
 )
 public class RecordedDataFilter extends ServletContextHelper {
 	
+	@Reference
+	private FendoDbAccessControl accessControl;
 	@Reference
 	private ComponentServiceObjects<PermissionManager> permManService;
     @Reference
@@ -63,6 +66,7 @@ public class RecordedDataFilter extends ServletContextHelper {
     			response.sendError(HttpServletResponse.SC_FORBIDDEN);
     			return false;
     		}
+    		accessControl.setAccessControlContext(ctx);
     		return true;
     	} catch (ServletException e) {
     		request.removeAttribute(REMOTE_USER);
@@ -86,26 +90,21 @@ public class RecordedDataFilter extends ServletContextHelper {
     	}
     }
 
+    /**
+     * Basic access check based on Http method. More fine-grained control is implemented by 
+     * FendoDbFactory. For this purpose, we set the access control context in 
+     * {@link #handleSecurity(HttpServletRequest, HttpServletResponse)}.
+     * @param req
+     * @param ctx
+     * @return
+     */
 	private boolean checkAccess(final HttpServletRequest req, final AccessControlContext ctx) {
 		final String path = req.getParameter("db"); // Parameters.PARAM_DB
-		if (path == null) {// listing all databases... 
-			if (!"GET".equalsIgnoreCase(req.getMethod()))
-				return false;
-			final PermissionManager permMan = permManService.getService();
-			try {
-				permMan.setAccessContext(ctx); // FIXME that does not work... need a different approach to limit the dbs to be shown
-				return true;
-			} finally {
-				permManService.ungetService(permMan);
-			}
-		}
+		if (path == null) // listing all databases... 
+			return "GET".equalsIgnoreCase(req.getMethod());
 		final Path database = Paths.get(path).normalize();
-		/*
-		 * Get The authentication information
-		 */
 		final String method = req.getMethod();
 		final String action;
-		// TODO more fine-grained
 		switch (method) {
 		case "DELETE":
 		case "PUT":
@@ -120,10 +119,10 @@ public class RecordedDataFilter extends ServletContextHelper {
 		final FendoDbPermission perm = new FendoDbPermission("perm", database.toString().replace('\\', '/'), action);
 		try {
 			ctx.checkPermission(perm);
-			return true;
 		} catch (SecurityException e) {
 			return false;
 		}
+		return true;
 	}
 
 }

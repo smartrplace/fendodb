@@ -1,6 +1,7 @@
 package org.smartrplace.logging.fendodb.context.test;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.security.Permission;
@@ -42,7 +43,6 @@ import org.apache.http.util.EntityUtils;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
-import org.junit.Ignore;
 
 @ExamReactorStrategy(PerClass.class)
 @RunWith(PaxExam.class)
@@ -268,7 +268,6 @@ public class ContextTest {
 				HttpServletResponse.SC_UNAUTHORIZED, response.returnResponse().getStatusLine().getStatusCode());
 	}
 	
-	@Ignore("TODO")
 	@Test
 	public void forbiddenRestAccessIsDenied() throws IOException, InterruptedException {
 		final String user = createUser();
@@ -291,9 +290,24 @@ public class ContextTest {
 	}
 
 	@Test
-	public void allowedRestAccessWorks() throws IOException, InterruptedException {
+	public void allowedRestAccessWorks0() throws IOException, InterruptedException {
 		final String user = createUser();
-		Assert.assertTrue("Permission creation failed",addUserFendoPermission(user, instance.getPath().toString(), true, false, false));
+		final String path = instance.getPath().normalize().toString().replace('\\', '/');
+		Assert.assertTrue("Permission creation failed",addUserFendoPermission(user, path, true, false, false));
+		final Request get = Request.Get(BASE_URL + "?user=" + user + "&pw=" + user);
+		final HttpResponse response = get.execute().returnResponse();
+		Assert.assertEquals("Expected status code OK (200)",
+				HttpServletResponse.SC_OK, response.getStatusLine().getStatusCode());
+		final String resp = EntityUtils.toString(response.getEntity(), StandardCharsets.UTF_8);
+		Assert.assertNotNull(resp);
+		Assert.assertEquals("Unexpected database set",path, resp.trim());
+		deleteUser(user);
+	}
+	
+	@Test
+	public void allowedRestAccessWorks1() throws IOException, InterruptedException {
+		final String user = createUser();
+		Assert.assertTrue("Permission creation failed", addUserFendoPermission(user, instance.getPath().toString(), true, false, false));
 		final Request get = Request.Get(BASE_URL + "?user=" + user + "&pw=" + user + "&db=" 
 				+ instance.getPath().toString().replace('\\', '/'));
 		final HttpResponse response = get.execute().returnResponse();
