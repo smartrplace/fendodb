@@ -34,7 +34,6 @@ import org.osgi.service.http.whiteboard.HttpWhiteboardConstants;
 import org.smartrplace.logging.fendodb.permissions.FendoDbPermission;
 import org.smartrplace.logging.fendodb.rest.RecordedDataServlet;
 
-// TODO tests
 @Component(
 		service=ServletContextHelper.class,
 		property = {
@@ -87,10 +86,19 @@ public class RecordedDataFilter extends ServletContextHelper {
     	}
     }
 
-	private static boolean checkAccess(final HttpServletRequest req, final AccessControlContext ctx) {
+	private boolean checkAccess(final HttpServletRequest req, final AccessControlContext ctx) {
 		final String path = req.getParameter("db"); // Parameters.PARAM_DB
-		if (path == null)
-			return "GET".equalsIgnoreCase(req.getMethod()); // listing all databases... // FIXME set access context, so only admissible dbs are shown?
+		if (path == null) {// listing all databases... 
+			if (!"GET".equalsIgnoreCase(req.getMethod()))
+				return false;
+			final PermissionManager permMan = permManService.getService();
+			try {
+				permMan.setAccessContext(ctx); // FIXME that does not work... need a different approach to limit the dbs to be shown
+				return true;
+			} finally {
+				permManService.ungetService(permMan);
+			}
+		}
 		final Path database = Paths.get(path).normalize();
 		/*
 		 * Get The authentication information
