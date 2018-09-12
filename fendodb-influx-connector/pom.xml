@@ -40,6 +40,10 @@
                 			!org.conscrypt,
                 			*
                 		</Import-Package>
+                		<!-- requires executor service -->
+                		<Require-Capability>
+                			smartrplace.housekeeping; filter:="(&amp;(version&gt;=1.0)(!(version&gt;=2.0)))"
+                		</Require-Capability>
                 	</instructions>
                 </configuration>
             </plugin>

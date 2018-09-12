@@ -20,5 +20,6 @@ public @interface InfluxConfig {
 	String pw();
 	String influxdb();
 	String fendodb();
+	String measurementid();
 	
 }

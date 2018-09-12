@@ -3,20 +3,28 @@ package org.smartrplace.logging.fendodb.influx;
 import java.io.IOException;
 import java.nio.file.InvalidPathException;
 import java.nio.file.Paths;
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
 import org.influxdb.InfluxDB;
 import org.influxdb.InfluxDBFactory;
 import org.influxdb.dto.BatchPoints;
+import org.influxdb.dto.BoundParameterQuery.QueryBuilder;
 import org.influxdb.dto.Point;
+import org.influxdb.dto.Query;
+import org.influxdb.dto.QueryResult.Result;
+import org.influxdb.dto.QueryResult.Series;
 import org.ogema.core.channelmanager.measurements.SampledValue;
-import org.ogema.core.timeseries.ReadOnlyTimeSeries;
 import org.ogema.tools.timeseries.iterator.api.MultiTimeSeriesIterator;
 import org.ogema.tools.timeseries.iterator.api.MultiTimeSeriesIteratorBuilder;
 import org.ogema.tools.timeseries.iterator.api.SampledValueDataPoint;
@@ -25,6 +33,7 @@ import org.osgi.service.component.annotations.Activate;
 import org.osgi.service.component.annotations.Component;
 import org.osgi.service.component.annotations.ConfigurationPolicy;
 import org.osgi.service.component.annotations.Reference;
+import org.osgi.service.metatype.annotations.Designate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.smartrplace.logging.fendodb.CloseableDataRecorder;
@@ -34,8 +43,7 @@ import org.smartrplace.logging.fendodb.tagging.api.LogDataTaggingConstants;
 
 /*
  * TODO
- *  - set timeseries path as a tag?
- *  - check last upload, export only newer data
+ *  - split into multiple measurements?
  */
 @Component(
 		service = Runnable.class,
@@ -49,6 +57,7 @@ import org.smartrplace.logging.fendodb.tagging.api.LogDataTaggingConstants;
 				"service.factoryPid=" + InfluxConfig.PID
 		}
 )
+@Designate(ocd=InfluxConfig.class)
 // see https://github.com/influxdata/influxdb-java
 public class InfluxExport implements Runnable {
 	
@@ -73,6 +82,7 @@ public class InfluxExport implements Runnable {
 	protected void activate(InfluxConfig config) {
 		this.config = config;
 		this.influx  = InfluxDBFactory.connect(config.url(), config.user(), config.pw());
+		influx.setDatabase(config.influxdb());
 	}
 
 	@Override
@@ -101,14 +111,22 @@ public class InfluxExport implements Runnable {
 	
 	private long transfer(final CloseableDataRecorder fendo) {
 		final List<FendoTimeSeries> ts = fendo.getAllTimeSeries();
-		final Map<String, List<FendoTimeSeries>> tsByTags = ts.stream()
-			.collect(Collectors.groupingBy(InfluxExport::getTagsAsString));
-		return tsByTags.values().stream().mapToLong(tag -> transfer(tag, fendo.getPath().toString().replace('\\', '/'))) // TODO do we need to replace any characters?
+//		final Map<String, List<FendoTimeSeries>> tsByTags = ts.stream()
+//			.collect(Collectors.groupingBy(InfluxExport::getTagsAsString));
+//		return tsByTags.values().stream().mapToLong(tag -> transfer(tag, fendo.getPath().toString().replace('\\', '/'))) // TODO do we need to replace any characters?
+//			.sum();
+		final String fendoId = fendo.getPath().toString().replace('\\', '/');
+		return ts.stream()
+			.mapToLong(t -> transfer(Collections.singletonList(t), fendoId))
 			.sum();
 	}	
 	
-	// TODO check which values have been written already, only send new ones!
 	private long transfer(final List<FendoTimeSeries> timeSeries, final String fendoId) {
+		final long max = timeSeries.stream()
+			.mapToLong(ts -> getLastTimestamp(ts))
+			.max().orElse(Long.MIN_VALUE);
+		if (max == Long.MAX_VALUE)
+			return 0;
 		final BatchPoints.Builder builder = BatchPoints.database(config.influxdb())
 				.precision(TimeUnit.MILLISECONDS);
 		// Influx DB supports a single tag value only
@@ -120,22 +138,76 @@ public class InfluxExport implements Runnable {
 				.collect(Collectors.toList());
 		final List<Point> points;
 		if (timeSeries.size() == 1)
-			points = getPoints(timeSeries.get(0).iterator(), fendoId, fieldIds.get(0));
+			points = getPoints(timeSeries.get(0).getPath(), timeSeries.get(0).iterator(max, Long.MAX_VALUE), config.measurementid(), fieldIds.get(0));
 		else {
 			final MultiTimeSeriesIterator it = 
-					MultiTimeSeriesIteratorBuilder.newBuilder(timeSeries.stream().map(ReadOnlyTimeSeries::iterator).collect(Collectors.toList())).build();
-			points = getPoints(it, fendoId, fieldIds);
+					MultiTimeSeriesIteratorBuilder.newBuilder(timeSeries.stream().map(t -> t.iterator(max, Long.MAX_VALUE)).collect(Collectors.toList())).build();
+			points = getPoints(timeSeries.stream().map(FendoTimeSeries::getPath).collect(Collectors.toList()), it, config.measurementid(), fieldIds);
 		}
 		if (points.isEmpty())
 			return 0;
 		final Point[] arr = new Point[points.size()];
 		points.toArray(arr);
-		final BatchPoints batchPoints = BatchPoints.database(config.influxdb())
+		final BatchPoints batchPoints = builder
 				.points(arr)
 				.build();
-			influx.setDatabase(config.influxdb());
 			influx.write(batchPoints);
 		return arr.length;
+	}
+	
+	private long getLastTimestamp(final FendoTimeSeries ts) {
+		final String path =  ts.getPath();
+		final String fieldId = getFieldNameFromProperties(ts.getProperties());
+		final String query = "SELECT last(\"" + fieldId + "\") FROM \"" + config.measurementid() + "\" WHERE \"path\"='" + path +  "'";
+		List<Result> results;
+		try {
+			results = sendQuery(QueryBuilder.newQuery(query).forDatabase(config.influxdb()).create());
+		} catch (InterruptedException e) {
+			Thread.currentThread().interrupt();
+			return Long.MAX_VALUE;
+		}
+		if (results == null || results.isEmpty())
+			return Long.MIN_VALUE;
+		final List<Series> seriesList = results.iterator().next().getSeries();
+		if (seriesList == null || seriesList.isEmpty())
+			return Long.MIN_VALUE;
+		final Series series = seriesList.iterator().next();
+		int i = 0;
+		final List<String> cols = series.getColumns();
+		if (cols == null || cols.isEmpty())
+			return Long.MIN_VALUE;
+		while (i < cols.size()) {
+			if ("time".equals(cols.get(i)))
+				break;
+			i++;
+		}
+		if (i == cols.size())
+			return Long.MIN_VALUE;
+		final String time = (String) series.getValues().iterator().next().get(i);
+		return ZonedDateTime.from(DateTimeFormatter.ISO_DATE_TIME.parse(time)).toInstant().toEpochMilli();
+	}
+	
+	private final List<Result> sendQuery(final Query query) throws InterruptedException {
+		final CountDownLatch latch = new CountDownLatch(1);
+		final AtomicReference<List<Result>> results = new AtomicReference<>();
+		final AtomicReference<Throwable> error = new AtomicReference<>();
+		influx.setDatabase(config.influxdb());
+		influx.query(query, result -> {
+				results.set(result == null ? null : result.getResults());
+				latch.countDown();
+			}, exc -> {
+				error.set(exc);
+				latch.countDown();
+			});
+		if (!latch.await(30, TimeUnit.SECONDS)) {
+			LoggerFactory.getLogger(getClass()).warn("Request timed out");
+			return null;
+		}
+		if (error.get() != null) {
+			LoggerFactory.getLogger(getClass()).warn("Request failed",error.get());
+			return null;
+		}
+		return results.get();
 	}
 	
 	private static String getFieldNameFromProperties(final Map<String, List<String>> props) {
@@ -149,29 +221,31 @@ public class InfluxExport implements Runnable {
 		return list.stream().filter(str -> str.toLowerCase().contains(value)).findAny().isPresent();
 	}
 	
-	private static List<Point> getPoints(final Iterator<SampledValue> it, final String fendoId, final String fieldId) {
+	private static List<Point> getPoints(final String path, final Iterator<SampledValue> it, final String measurementId, final String fieldId) {
 		final List<Point> points = new ArrayList<>();
 		while(it.hasNext()) {
 			final SampledValue sv = it.next();
-			final Point point = Point.measurement("fendodb_" + fendoId)
+			final Point point = Point.measurement(measurementId)
 					.time(sv.getTimestamp(), TimeUnit.MILLISECONDS)
 					.addField(fieldId, sv.getValue().getDoubleValue())
+					.tag("path", path)
 					.build();
 			points.add(point);
 		}
 		return points;
 	}
 	
-	private static List<Point> getPoints(final MultiTimeSeriesIterator it, final String fendoId, final List<String> fieldIds) {
+	private static List<Point> getPoints(final List<String> paths, final MultiTimeSeriesIterator it, final String measurementId, final List<String> fieldIds) {
 		final List<Point> points = new ArrayList<>();
 		while(it.hasNext()) {
 			final SampledValueDataPoint data = it.next();
-			final Point.Builder pb = Point.measurement("fendodb_" + fendoId)
+			final Point.Builder pb = Point.measurement(measurementId)
 					.time(data.getTimestamp(), TimeUnit.MILLISECONDS);
 			for (int i=0; i< fieldIds.size(); i++) {
 				final SampledValue sv = data.getElement(i);
 				if (sv != null) {
 					pb.addField(fieldIds.get(i), sv.getValue().getDoubleValue());
+					pb.tag("path", paths.get(i)); // FIXME multiple path tags not possible
 				}
 			}
 			points.add(pb.build());
@@ -184,6 +258,10 @@ public class InfluxExport implements Runnable {
 			.map(entry -> entry.getKey() + "=" +entry.getValue().stream().collect(Collectors.joining(",")))
 			.collect(Collectors.joining(";"));
 	}
-
+	
+	@Override
+	public String toString() {
+		return "FendoDB -> InfluxDB Export [FendoDB: " + config.fendodb() + ", InfluxDB: " + config.url() + ":" + config.influxdb() + "]";
+	}
 	
 }
