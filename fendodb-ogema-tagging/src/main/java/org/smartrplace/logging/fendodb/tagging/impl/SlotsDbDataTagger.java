@@ -24,6 +24,7 @@ import java.security.PrivilegedAction;
 import java.util.Hashtable;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ForkJoinPool;
 
 import org.ogema.core.application.Application;
 import org.ogema.core.application.ApplicationManager;
@@ -83,16 +84,18 @@ public class SlotsDbDataTagger implements Application, FendoDbFactory.SlotsDbLis
 		this.shellCommands = null;
 		final AutoCloseable tagger = this.continuousTagger;
 		this.continuousTagger = null;
-		if (tagger != null) {
-			try {
-				tagger.close();
-			} catch (Exception ignore) {}
-		}
-		if (sreg != null) {
-			try {
-				sreg.unregister();
-			} catch (Exception ignore) {}
-		}
+		ForkJoinPool.commonPool().submit(() -> {
+			if (tagger != null) {
+				try {
+					tagger.close();
+				} catch (Exception ignore) {}
+			}
+			if (sreg != null) {
+				try {
+					sreg.unregister();
+				} catch (Exception ignore) {}
+			}			
+		});
 		this.appManager = null;
 		this.ctx = null;
 		try {
@@ -112,7 +115,7 @@ public class SlotsDbDataTagger implements Application, FendoDbFactory.SlotsDbLis
 				final Resource r = ra.getResource(ts.getPath());
 				if (r == null)
 					return;
-				final Map<String, List<String>> tags = TaggingUtils.getResourceTags(r);
+				final Map<String, List<String>> tags = TaggingUtils.getResourceTags(r, ra);
 				ts.setProperties((Map) tags);
 			});
 			return true;

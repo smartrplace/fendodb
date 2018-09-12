@@ -60,7 +60,7 @@ class ContinuousTagger implements Consumer<FendoTimeSeries>, AutoCloseable {
 			final Resource r = ra.getResource(t.getPath());
 			if (r == null)
 				return;
-			final Map<String, List<String>> tags = TaggingUtils.getResourceTags(r);
+			final Map<String, List<String>> tags = TaggingUtils.getResourceTags(r, ra);
 			t.setProperties((Map) tags);
 		} catch (SecurityException ignore) {}
 	}	

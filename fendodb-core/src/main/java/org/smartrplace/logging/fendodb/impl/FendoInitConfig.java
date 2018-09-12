@@ -4,7 +4,6 @@ import org.osgi.service.metatype.annotations.ObjectClassDefinition;
 
 /**
  * Configuration to load FendoDb instances at framework start.
- * TODO move out of viz bundle
  */
 @ObjectClassDefinition
 public @interface FendoInitConfig {

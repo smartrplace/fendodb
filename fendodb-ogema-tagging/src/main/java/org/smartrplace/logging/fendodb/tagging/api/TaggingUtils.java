@@ -24,6 +24,8 @@ import java.util.List;
 import java.util.Map;
 
 import org.ogema.core.model.Resource;
+import org.ogema.core.model.simple.StringResource;
+import org.ogema.core.resourcemanager.ResourceAccess;
 import org.ogema.model.actors.Actor;
 import org.ogema.model.devices.buildingtechnology.ElectricLight;
 import org.ogema.model.devices.buildingtechnology.Thermostat;
@@ -142,6 +144,18 @@ public class TaggingUtils {
 	 * @return
 	 */
 	public static Map<String,List<String>> getResourceTags(final Resource resource) {
+		return getResourceTags(resource, null);
+	}
+	
+
+	/**
+	 * Returns a map of standard tags for this resource, with keys defined by the
+	 * constants in {@link LogDataTaggingConstants}.
+	 * @param resource
+	 * @param ra
+	 * @return
+	 */
+	public static Map<String,List<String>> getResourceTags(final Resource resource, final ResourceAccess ra) {
 		final Map<String, List<String>> result = new HashMap<>();
 //		Resource p = resource.getLocationResource();
 		Resource p = resource;
@@ -152,11 +166,26 @@ public class TaggingUtils {
 			checkForApplicationDomain(p, result);
 			checkForDataType(p, result);
 			checkForBuilding(p, result);
-			p = p.getParent();
+			try {
+				p = p.getParent();
+			} catch (SecurityException e) {
+				break;
+			}
+		}
+		if (ra != null) {
+			try {
+				final Resource r = ra.getResource("OGEMA_Gateway/id");
+				if (r instanceof StringResource)
+					result.put(LogDataTaggingConstants.GATEWAY_ID, Collections.singletonList(((StringResource) r).getValue()));
+			} catch (SecurityException e) {}
 		}
 		return result;
 	}
 
+	private static void checkForGatewayId() {
+		
+	}
+	
 	/**
 	 * Like {@link #getResourceTags(Resource)}, except that we cannot access the resource
 	 * (e.g. because it is defined on another gateway), and we can only try to deduce the
@@ -240,6 +269,14 @@ public class TaggingUtils {
 	private final static void checkForDeviceTypeSpecific(final Resource p, final Map<String, List<String>> result) {
 		if (!(p instanceof PhysicalElement))
 			return;
+		try {
+			final Resource name = p.getSubResource("name");
+			// it's difficult to determine which PhysicalElement in the tree is the correct one here... having a name should be a good criterion
+			if (name instanceof StringResource && name.isActive()) {
+				addProperty(result, LogDataTaggingConstants.DEVICE_PATH, p.getPath());
+				addProperty(result, LogDataTaggingConstants.DEVICE_NAME, ((StringResource) name).getValue());
+			}
+		} catch (SecurityException e) {}
 		appendSuperInterfaces(p.getResourceType(), result);
 	}
 

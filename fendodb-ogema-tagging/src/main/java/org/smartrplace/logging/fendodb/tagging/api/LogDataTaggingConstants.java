@@ -43,6 +43,10 @@ public class LogDataTaggingConstants {
 	 */
 	public static final String DEVICE_TYPE_SPECIFIC = "deviceTypeSpecific";
 
+	public static final String DEVICE_PATH = "devicePath";
+	
+	public static final String DEVICE_NAME = "deviceName";
+	
 	/**
 	 * Typical values for this key:
 	 * <ul>
@@ -72,12 +76,12 @@ public class LogDataTaggingConstants {
 	/**
 	 * The building this data belongs to.
 	 */
-	public static final String BUILDING_PATH = "building_path";
+	public static final String BUILDING_PATH = "buildingPath";
 	
 	/**
 	 * The building this data belongs to.
 	 */
-	public static final String BUILDING_NAME = "building_name";
+	public static final String BUILDING_NAME = "buildingName";
 	
 	/**
 	 * Typical values for this key are
@@ -87,5 +91,10 @@ public class LogDataTaggingConstants {
 	 * </ul>
 	 */
 	public static final String DATA_TYPE = "dataType";
+	
+	/**
+	 * The gateway id
+	 */
+	public static final String GATEWAY_ID = "gatewayId";
 	
 }

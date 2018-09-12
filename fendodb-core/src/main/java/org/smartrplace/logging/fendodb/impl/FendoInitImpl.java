@@ -25,7 +25,7 @@ import org.smartrplace.logging.fendodb.FendoDbFactory;
 		configurationPid = FendoInitImpl.PID,
 		configurationPolicy = ConfigurationPolicy.REQUIRE,
 		property = {
-				"service.pid=" + FendoInitImpl.PID
+				"service.factoryPid=" + FendoInitImpl.PID
 		}
 )
 @Designate(factory=true, ocd=FendoInitConfig.class)

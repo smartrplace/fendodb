@@ -58,6 +58,7 @@
 		<module>fendodb-admin-api</module>
 		<module>fendodb-api</module>
 		<module>fendodb-core</module>
+		<module>fendodb-influx-connector</module>
 		<module>fendodb-ogema-context</module>
 		<module>fendodb-ogema-tagging</module>
 		<module>fendodb-reader</module>
