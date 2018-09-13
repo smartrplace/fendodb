@@ -1,6 +1,7 @@
 package org.smartrplace.logging.fendodb.influx;
 
 import java.io.IOException;
+import java.lang.reflect.Field;
 import java.nio.file.InvalidPathException;
 import java.nio.file.Paths;
 import java.time.ZonedDateTime;
@@ -122,11 +123,9 @@ public class InfluxExport implements Runnable {
 	}	
 	
 	private long transfer(final List<FendoTimeSeries> timeSeries, final String fendoId) {
-		final long max = timeSeries.stream()
+		long max = timeSeries.stream()
 			.mapToLong(ts -> getLastTimestamp(ts))
 			.max().orElse(Long.MIN_VALUE);
-		if (max == Long.MAX_VALUE)
-			return 0;
 		final BatchPoints.Builder builder = BatchPoints.database(config.influxdb())
 				.precision(TimeUnit.MILLISECONDS);
 		// Influx DB supports a single tag value only
@@ -136,23 +135,38 @@ public class InfluxExport implements Runnable {
 				.map(FendoTimeSeries::getProperties)
 				.map(InfluxExport::getFieldNameFromProperties)
 				.collect(Collectors.toList());
-		final List<Point> points;
-		if (timeSeries.size() == 1)
-			points = getPoints(timeSeries.get(0).getPath(), timeSeries.get(0).iterator(max, Long.MAX_VALUE), config.measurementid(), fieldIds.get(0));
-		else {
-			final MultiTimeSeriesIterator it = 
-					MultiTimeSeriesIteratorBuilder.newBuilder(timeSeries.stream().map(t -> t.iterator(max, Long.MAX_VALUE)).collect(Collectors.toList())).build();
-			points = getPoints(timeSeries.stream().map(FendoTimeSeries::getPath).collect(Collectors.toList()), it, config.measurementid(), fieldIds);
+		long size = 0;
+		try {
+			final Field timeField = Point.class.getDeclaredField("time");
+			timeField.setAccessible(true);
+			while (true) {
+				if (max == Long.MAX_VALUE)
+					break;
+				final List<Point> points;
+				if (timeSeries.size() == 1)
+					points = getPoints(timeSeries.get(0).getPath(), timeSeries.get(0).iterator(max+1, Long.MAX_VALUE), config.measurementid(), fieldIds.get(0));
+				else {
+					final long max1 = max;
+					final MultiTimeSeriesIterator it = 
+							MultiTimeSeriesIteratorBuilder.newBuilder(timeSeries.stream().map(t -> t.iterator(max1+1, Long.MAX_VALUE)).collect(Collectors.toList())).build();
+					points = getPoints(timeSeries.stream().map(FendoTimeSeries::getPath).collect(Collectors.toList()), it, config.measurementid(), fieldIds);
+				}
+				if (points.isEmpty())
+					break;
+				final Point[] arr = new Point[points.size()];
+				points.toArray(arr);
+				final BatchPoints batchPoints = builder
+						.points(arr)
+						.build();
+					influx.write(batchPoints);
+				size += arr.length; 
+				// max = arr[arr.length-1].time
+				max = ((Long) timeField.get(arr[arr.length-1])).longValue();
+			}
+		} catch (IllegalAccessException | NoSuchFieldException | SecurityException e) {
+			throw new RuntimeException(e);
 		}
-		if (points.isEmpty())
-			return 0;
-		final Point[] arr = new Point[points.size()];
-		points.toArray(arr);
-		final BatchPoints batchPoints = builder
-				.points(arr)
-				.build();
-			influx.write(batchPoints);
-		return arr.length;
+		return size;
 	}
 	
 	private long getLastTimestamp(final FendoTimeSeries ts) {
@@ -223,7 +237,8 @@ public class InfluxExport implements Runnable {
 	
 	private static List<Point> getPoints(final String path, final Iterator<SampledValue> it, final String measurementId, final String fieldId) {
 		final List<Point> points = new ArrayList<>();
-		while(it.hasNext()) {
+		int cnt = 0;
+		while(it.hasNext() && cnt <= 1000) {
 			final SampledValue sv = it.next();
 			final Point point = Point.measurement(measurementId)
 					.time(sv.getTimestamp(), TimeUnit.MILLISECONDS)
@@ -231,6 +246,7 @@ public class InfluxExport implements Runnable {
 					.tag("path", path)
 					.build();
 			points.add(point);
+			cnt++;
 		}
 		return points;
 	}
