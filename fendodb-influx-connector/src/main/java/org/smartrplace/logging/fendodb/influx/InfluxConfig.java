@@ -19,6 +19,10 @@ public @interface InfluxConfig {
 	String user();
 	String pw();
 	String influxdb();
+	/**
+	 * Wildcard "*" allowed -> transfer all instances
+	 * @return
+	 */
 	String fendodb();
 	String measurementid();
 	

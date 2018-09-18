@@ -12,6 +12,7 @@ import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
@@ -38,6 +39,8 @@ import org.osgi.service.metatype.annotations.Designate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.smartrplace.logging.fendodb.CloseableDataRecorder;
+import org.smartrplace.logging.fendodb.FendoDbConfiguration;
+import org.smartrplace.logging.fendodb.FendoDbConfigurationBuilder;
 import org.smartrplace.logging.fendodb.FendoDbFactory;
 import org.smartrplace.logging.fendodb.FendoTimeSeries;
 import org.smartrplace.logging.fendodb.tagging.api.LogDataTaggingConstants;
@@ -50,7 +53,7 @@ import org.smartrplace.logging.fendodb.tagging.api.LogDataTaggingConstants;
 		service = Runnable.class,
 		configurationPid = InfluxConfig.PID,
 		configurationPolicy = ConfigurationPolicy.REQUIRE,
-		// default properties
+		// default properties, can be overwritten via config properties
 		property = {
 				"org.smartrplace.tools.housekeeping.Period:Long=6",
 				"org.smartrplace.tools.housekeeping.Delay:Long=6",
@@ -62,6 +65,7 @@ import org.smartrplace.logging.fendodb.tagging.api.LogDataTaggingConstants;
 // see https://github.com/influxdata/influxdb-java
 public class InfluxExport implements Runnable {
 	
+	private static final String UNKNOWN_FIELD_TYPE = "value";
 	private static final List<String> measurementTypes = Arrays.asList(
 			   "temperature",
 			   "humidity",
@@ -72,59 +76,125 @@ public class InfluxExport implements Runnable {
 			   "irradiation",
 			   "motion"
 		);
-
+	
 	@Reference
 	private ComponentServiceObjects<FendoDbFactory> fendoFactory;
 	
 	private InfluxDB influx;
 	private InfluxConfig config;
+	private final CompletableFuture<InfluxDB> future = new CompletableFuture<>();
 	
 	@Activate
-	protected void activate(InfluxConfig config) {
+	protected void activate(InfluxConfig config) throws InterruptedException {
 		this.config = config;
 		this.influx  = InfluxDBFactory.connect(config.url(), config.user(), config.pw());
 		influx.setDatabase(config.influxdb());
+		future.thenAcceptAsync(this::createDb);
+		if (!ping()) {
+			LoggerFactory.getLogger(getClass()).info("InfluxDb is not reachable");
+			return;
+		}
 	}
 
 	@Override
 	public void run() {
 		final Logger logger = LoggerFactory.getLogger(getClass());
 		logger.info("Uploading FendoDb data to InfluxDb");
-		if (!influx.ping().isGood()) {
+		if (!ping()) {
 			logger.info("InfluxDb is not reachable");
 			return;
 		}
+		final String path = config.fendodb();
 		final FendoDbFactory factory = fendoFactory.getService();
 		try {
-			final CloseableDataRecorder instance = factory.getExistingInstance(Paths.get(config.fendodb()));
-			if ( instance == null) {
-				logger.warn("Configured FendoDb instance does not exist: {}", config.fendodb());
-				return;
+			if (path.contains("*")) {
+				final String prefix = path.substring(0, path.indexOf('*'));
+				factory.getAllInstances().entrySet().stream()
+					.filter(entry -> entry.getKey().toString().replace('\\', '/').startsWith(prefix))
+					.map(Map.Entry::getValue)
+					.forEach(reference -> {
+						final FendoDbConfiguration config = FendoDbConfigurationBuilder.getInstance(reference.getConfiguration())
+							.setReadOnlyMode(true)
+							.build();
+						try {
+							final long size = transfer(reference.getDataRecorder(config), reference.getPath().toString().replace('\\', '/'));
+							logger.info("Uploaded {} data points for FendoDb {}", size, reference.getPath());
+						} catch (IOException | SecurityException e) {
+							logger.warn("Failed to transfer FendoDb data",e);
+						}	
+					});
+			} else {
+				try {
+					final CloseableDataRecorder instance = factory.getExistingInstance(Paths.get(config.fendodb()));
+					if ( instance == null) {
+						logger.warn("Configured FendoDb instance does not exist: {}", config.fendodb());
+						return;
+					}
+					final long size = transfer(instance, null);
+					logger.info("Uploaded {} data points.", size);
+				} catch (IOException | InvalidPathException e) {
+					logger.warn("Failed to transfer FendoDb data",e);
+				}
 			}
-			final long size = transfer(instance);
-			logger.info("Uploaded {} data points.", size);
-		} catch (IOException | InvalidPathException e) {
-			logger.warn("Failed to transfer FendoDb data",e);
 		} finally {
 			fendoFactory.ungetService(factory);
 		}
 	}
 	
-	private long transfer(final CloseableDataRecorder fendo) {
+	private void createDb(final InfluxDB influx) {
+		final Query query = QueryBuilder.newQuery("CREATE DATABASE \"" + config.influxdb() + "\"")
+				.forDatabase(config.influxdb())
+				.create();
+		final CountDownLatch latch = new CountDownLatch(1);
+		final AtomicReference<List<Result>> results = new AtomicReference<>();
+		final AtomicReference<Throwable> error = new AtomicReference<>();
+		influx.query(query, result -> {
+				results.set(result == null ? null : result.getResults());
+				latch.countDown();
+			}, exc -> {
+				error.set(exc);
+				latch.countDown();
+			});
+		try {
+			if (!latch.await(60, TimeUnit.SECONDS)) {
+				LoggerFactory.getLogger(getClass()).info("Database creation request timed out");
+			}
+			else if (error.get() != null) {
+				LoggerFactory.getLogger(getClass()).info("Database creation request failed: {}", error.get());
+			} else {
+				LoggerFactory.getLogger(getClass()).info("Database created: {}", results.get());
+			}
+		} catch (InterruptedException e) {
+			Thread.currentThread().interrupt();
+		}
+	}
+	
+	private final boolean ping() {
+		boolean success = false;
+		try {
+			success = influx.ping().isGood();
+			if (success && !future.isDone())
+				future.complete(influx);
+		} catch (Exception expected) {} // XXX exceptions on Influx connector lib not documented
+		return success;
+	}
+	
+	private long transfer(final CloseableDataRecorder fendo, final String instance) {
 		final List<FendoTimeSeries> ts = fendo.getAllTimeSeries();
 //		final Map<String, List<FendoTimeSeries>> tsByTags = ts.stream()
 //			.collect(Collectors.groupingBy(InfluxExport::getTagsAsString));
 //		return tsByTags.values().stream().mapToLong(tag -> transfer(tag, fendo.getPath().toString().replace('\\', '/'))) // TODO do we need to replace any characters?
 //			.sum();
-		final String fendoId = fendo.getPath().toString().replace('\\', '/');
 		return ts.stream()
-			.mapToLong(t -> transfer(Collections.singletonList(t), fendoId))
+			.mapToLong(t -> transfer(Collections.singletonList(t), instance))
 			.sum();
 	}	
 	
-	private long transfer(final List<FendoTimeSeries> timeSeries, final String fendoId) {
+	private long transfer(final List<FendoTimeSeries> timeSeries, final String instance) {
+		final String measId0 = config.measurementid();
+		final String measurementId = instance != null && measId0.isEmpty() ? instance : instance != null ? measId0 + "_" + instance : measId0;
 		long max = timeSeries.stream()
-			.mapToLong(ts -> getLastTimestamp(ts))
+			.mapToLong(ts -> getLastTimestamp(ts, measurementId))
 			.max().orElse(Long.MIN_VALUE);
 		final BatchPoints.Builder builder = BatchPoints.database(config.influxdb())
 				.precision(TimeUnit.MILLISECONDS);
@@ -143,13 +213,13 @@ public class InfluxExport implements Runnable {
 				if (max == Long.MAX_VALUE)
 					break;
 				final List<Point> points;
-				if (timeSeries.size() == 1)
-					points = getPoints(timeSeries.get(0).getPath(), timeSeries.get(0).iterator(max+1, Long.MAX_VALUE), config.measurementid(), fieldIds.get(0));
+				if (timeSeries.size() == 1) 
+					points = getPoints(timeSeries.get(0).getPath(), timeSeries.get(0).iterator(max+1, Long.MAX_VALUE), measurementId, fieldIds.get(0));
 				else {
 					final long max1 = max;
 					final MultiTimeSeriesIterator it = 
 							MultiTimeSeriesIteratorBuilder.newBuilder(timeSeries.stream().map(t -> t.iterator(max1+1, Long.MAX_VALUE)).collect(Collectors.toList())).build();
-					points = getPoints(timeSeries.stream().map(FendoTimeSeries::getPath).collect(Collectors.toList()), it, config.measurementid(), fieldIds);
+					points = getPoints(timeSeries.stream().map(FendoTimeSeries::getPath).collect(Collectors.toList()), it, measurementId, fieldIds);
 				}
 				if (points.isEmpty())
 					break;
@@ -169,10 +239,10 @@ public class InfluxExport implements Runnable {
 		return size;
 	}
 	
-	private long getLastTimestamp(final FendoTimeSeries ts) {
+	private long getLastTimestamp(final FendoTimeSeries ts, final String measurementId) {
 		final String path =  ts.getPath();
 		final String fieldId = getFieldNameFromProperties(ts.getProperties());
-		final String query = "SELECT last(\"" + fieldId + "\") FROM \"" + config.measurementid() + "\" WHERE \"path\"='" + path +  "'";
+		final String query = "SELECT last(\"" + fieldId + "\") FROM \"" + measurementId + "\" WHERE \"path\"='" + path +  "'";
 		List<Result> results;
 		try {
 			results = sendQuery(QueryBuilder.newQuery(query).forDatabase(config.influxdb()).create());
@@ -226,9 +296,11 @@ public class InfluxExport implements Runnable {
 	
 	private static String getFieldNameFromProperties(final Map<String, List<String>> props) {
 		final List<String> deviceTypes = props.get(LogDataTaggingConstants.DEVICE_TYPE_SPECIFIC);
+		if (deviceTypes == null)
+			return UNKNOWN_FIELD_TYPE;
 		return measurementTypes.stream()
 			.filter(type -> containsIgnoreCase(deviceTypes, type))
-			.findFirst().orElse("unknown");
+			.findFirst().orElse(UNKNOWN_FIELD_TYPE);
 	}
 	
 	private static boolean containsIgnoreCase(final List<String> list, final String value) {
