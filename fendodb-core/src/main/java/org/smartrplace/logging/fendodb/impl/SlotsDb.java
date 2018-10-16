@@ -224,7 +224,7 @@ public class SlotsDb implements CloseableDataRecorder {
 					.mapToLong(Long::longValue)
 					.max();
 			// year 5000 as threshold; not very nice, but we need to use heuristics here, since there is no explicit config
-			return anyFolder.isPresent() ? anyFolder.getAsLong() < 5000 : false; 
+			return anyFolder.isPresent() ? anyFolder.getAsLong() < 50000000 : false; 
 		} catch (IOException e) {
 			return false;
 		}
