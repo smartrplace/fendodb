@@ -41,6 +41,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.OptionalLong;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
@@ -176,7 +177,7 @@ public class SlotsDb implements CloseableDataRecorder {
 			// persisted config
 			final FendoDbConfiguration persistedConfig =
 				(!slotsDbStorages.isEmpty() || configuration == null) ? readConfig(persistentConfig) : null;
-			this.config = buildFinalConfiguration(configuration, persistedConfig, hardConfigReset, slotsDbStorages.isEmpty());
+			this.config = buildFinalConfiguration(configuration, persistedConfig, path, hardConfigReset, slotsDbStorages.isEmpty());
 			this.proxy = new FileObjectProxy(dbBaseFolder, clock, config);
 			final FendoDbConfiguration nextConfig = FendoDbConfigurationBuilder.getInstance(config)
 					.setParseFoldersOnInit(false)
@@ -209,6 +210,26 @@ public class SlotsDb implements CloseableDataRecorder {
 				|| !config0.getFolderCreationTimeUnit().equals(config1.getFolderCreationTimeUnit());
 	}
 
+	private static boolean looksLikeCompatMode(final Path baseFolder) {
+		try (final Stream<Path> stream0 = Files.list(baseFolder)) {
+			final OptionalLong anyFolder = stream0.filter(Files::isDirectory)
+					.map(p -> {
+						try {
+							return Long.parseLong(p.getFileName().toString());
+						} catch (NumberFormatException e) {
+							return null;
+						}
+					})
+					.filter(Objects::nonNull)
+					.mapToLong(Long::longValue)
+					.max();
+			// year 5000 as threshold; not very nice, but we need to use heuristics here, since there is no explicit config
+			return anyFolder.isPresent() ? anyFolder.getAsLong() < 5000 : false; 
+		} catch (IOException e) {
+			return false;
+		}
+	}
+	
 	/**
 	 * We cannot simply accept the passed configuration, since for instance the use of
 	 * compatibility mode or the time unit require major file operations. In order to update those,
@@ -223,6 +244,7 @@ public class SlotsDb implements CloseableDataRecorder {
 	private static final FendoDbConfiguration buildFinalConfiguration (
 			final FendoDbConfiguration passedConfiguration,
 			final FendoDbConfiguration persistedConfiguration,
+			final Path path,
 			final boolean hardConfigReset,
 			final boolean dbEmpty) throws IOException {
 		// if no persisted data exists yet, we can freely change the configuration; otherwise we need to reload the existing
@@ -232,10 +254,11 @@ public class SlotsDb implements CloseableDataRecorder {
 				persistedConfiguration != null ? persistedConfiguration.isReadOnlyMode() :
 				false;
 		final boolean compatMode =
-				(!dbEmpty && (persistedConfiguration == null || persistedConfiguration.useCompatibilityMode())) ||
+				(!dbEmpty && ((persistedConfiguration == null && looksLikeCompatMode(path))
+					|| (persistedConfiguration != null && persistedConfiguration.useCompatibilityMode()))) ||
 				(dbEmpty && passedConfiguration != null && passedConfiguration.useCompatibilityMode());
 		final TemporalUnit unit =
-				compatMode ? ChronoUnit.DAYS :
+				compatMode || persistedConfiguration == null ? ChronoUnit.DAYS :
 				!dbEmpty ? persistedConfiguration.getFolderCreationTimeUnit() :
 				passedConfiguration != null ? passedConfiguration.getFolderCreationTimeUnit() :
 				ChronoUnit.DAYS;

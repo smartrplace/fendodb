@@ -73,7 +73,7 @@ public class FendoInitImpl {
 					instance = factory.getInstance(path, cfg);
 				}
 				this.instance = instance;
-			} catch (IOException | IllegalStateException | SecurityException e) {
+			} catch (Exception e) {
 				LoggerFactory.getLogger(getClass()).warn("Could not create FendoDb instance {}", path, e);
 			}
 		});
