@@ -830,6 +830,17 @@ public class SlotsDb implements CloseableDataRecorder {
 				.minus(amount).toInstant(), proxy.unit).toEpochMilli();
 		return deleteDataFrom(limit, true);
 	}
+	
+	@Override
+	public void reloadDays() throws IOException {
+		proxy.folderLock.writeLock().lock();
+		try {
+			proxy.reloadDays();
+		} finally {
+			proxy.folderLock.writeLock().unlock();
+		}
+		
+	}
 
 	private boolean deleteDataFrom(final long t0, final boolean beforeOrAfter) throws IOException {
 		synchronized (slotsDbStorages) {

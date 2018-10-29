@@ -203,5 +203,12 @@ public interface CloseableDataRecorder extends DataRecorder, AutoCloseable {
 	 */
 	// FIXME remove?
 	Lock getDbLock();
+	
+	/**
+	 * Administrative function to update the data if the internal folder list has been updated by other means
+	 * than the exposed API.
+	 * @throws IOException 
+	 */
+	void reloadDays() throws IOException;
 
 }

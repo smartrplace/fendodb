@@ -105,6 +105,7 @@ public class FendoDbOverviewPage implements LazyWidgetPage {
 		private final ValueInputField<Long> newFlushPeriodField;
 		private final ValueInputField<Integer> newMaxOpenFilesField;
 		private final Button newDbSubmit;
+		private final Button reloadDaysSubmit;
 		private final Button newPopupTrigger;
 	
 		private final Popup copyPopup;
@@ -347,7 +348,31 @@ public class FendoDbOverviewPage implements LazyWidgetPage {
 	//		newPopupHeader.addDefaultStyle(WidgetData.TEXT_ALIGNMENT_CENTERED);
 	//		newPopupHeader.setDefaultColor("blue");
 			this.newPopupTrigger = new Button(page, "newPopupTrigger", "Open dialog");
-	
+			
+			this.reloadDaysSubmit = new Button(page, "reloadDaysSubmit", "Reload days") {
+				
+				public void onGET(OgemaHttpRequest req) {
+					final DataRecorderReference recorder = slotsSelector.getSelectedItem(req);
+					if (recorder == null)
+						disable(req);
+					else
+						enable(req);
+				}
+				
+				public void onPOSTComplete(String data, OgemaHttpRequest req) {
+					final DataRecorderReference ref = slotsSelector.getSelectedItem(req);
+					if (ref == null)
+						return;
+					try (final CloseableDataRecorder recorder = ref.getDataRecorder()) {
+						recorder.reloadDays();
+						alert.showAlert("Days folder list reloaded", true, req);
+					} catch (IOException e) {
+						alert.showAlert("Failed to reload folders list: " + e, false, req);
+					}
+				}
+				
+			};
+			
 			this.copyDbFolder = new TextField(page, "copyDbFolder");
 			this.copyCompatModeField = new Checkbox(page, "copyCompatModeField") {
 	
@@ -647,7 +672,7 @@ public class FendoDbOverviewPage implements LazyWidgetPage {
 			};
 	
 			this.dependentFields = page.registerWidgetGroup("dependentFields", Arrays.asList(
-					readOnlyModeField, compatModeField, unitField, flushPeriodField, maxDaysField, maxSizeField, maxOpenFilesField, closeDb,
+					readOnlyModeField, compatModeField, unitField, flushPeriodField, maxDaysField, maxSizeField, maxOpenFilesField, closeDb, reloadDaysSubmit,
 					copyReadOnlyModeField, copyCompatModeField, copyUnitField, copyFlushPeriodField, copyMaxDaysField, copyMaxSizeField, copyMaxOpenFilesField,
 					updateReadOnlyModeField, updateCompatModeField, updateUnitField, updateFlushPeriodField, updateMaxDaysField, updateMaxSizeField, updateMaxOpenFilesField
 				));
@@ -709,7 +734,7 @@ public class FendoDbOverviewPage implements LazyWidgetPage {
 			row = 0;
 			page.append(header).linebreak()
 				.append(alert)
-				.append(new StaticTable(12, 2, new int[] {3,3})
+				.append(new StaticTable(13, 2, new int[] {3,3})
 						.setContent(row, 0, "Select FendoDB instance").setContent(row++, 1, slotsSelector)
 						.setContent(row, 0, "Open in read only mode?").setContent(row++, 1, readOnlyModeField)
 						.setContent(row, 0, "Use compatibility mode?").setContent(row++, 1, compatModeField)
@@ -719,6 +744,7 @@ public class FendoDbOverviewPage implements LazyWidgetPage {
 						.setContent(row, 0, "Max db size").setContent(row++, 1, maxSizeField)
 						.setContent(row, 0, "Max open files").setContent(row++, 1, maxOpenFilesField)
 						.setContent(row, 0, "Update settings").setContent(row++, 1, updatePopupTrigger)
+						.setContent(row, 0, "Reload days folders").setContent(row++, 1, reloadDaysSubmit)
 						.setContent(row, 0, "Close instance").setContent(row++, 1, closeDb)
 						.setContent(row, 0, "Copy instance").setContent(row++, 1, copyPopupTrigger)
 						.setContent(row, 0, "Create a new instance").setContent(row++, 1, newPopupTrigger)
@@ -752,6 +778,8 @@ public class FendoDbOverviewPage implements LazyWidgetPage {
 			updateDbSubmit.triggerAction(updatePopup, TriggeringAction.POST_REQUEST, TriggeredAction.HIDE_WIDGET);
 			updatePopupTrigger.triggerAction(updatePopup, TriggeringAction.POST_REQUEST, TriggeredAction.SHOW_WIDGET);
 			updateCompatModeField.triggerAction(updateUnitField, TriggeringAction.POST_REQUEST, TriggeredAction.GET_REQUEST);
+			
+			reloadDaysSubmit.triggerAction(alert, TriggeringAction.POST_REQUEST, TriggeredAction.GET_REQUEST);
 		}
 	
 		private final static long getFlushPeriodSeconds(final FendoDbConfiguration config) {

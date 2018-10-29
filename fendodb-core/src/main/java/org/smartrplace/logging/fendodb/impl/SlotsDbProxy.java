@@ -247,5 +247,10 @@ class SlotsDbProxy implements CloseableDataRecorder {
 			throw new AccessControlException("Admin permission required to remove listener");
 		master.removeTimeSeriesListener(listener);
 	}
+	
+	@Override
+	public void reloadDays() throws IOException {
+		master.reloadDays();
+	}
 
 }
