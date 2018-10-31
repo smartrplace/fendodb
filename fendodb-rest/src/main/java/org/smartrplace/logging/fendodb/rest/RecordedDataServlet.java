@@ -19,6 +19,7 @@ package org.smartrplace.logging.fendodb.rest;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.Writer;
+import java.net.URLDecoder;
 import java.nio.file.Paths;
 import java.time.Instant;
 import java.time.format.DateTimeFormatter;
@@ -27,10 +28,12 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 import javax.servlet.Servlet;
 import javax.servlet.ServletException;
@@ -363,6 +366,31 @@ public class RecordedDataServlet extends HttpServlet {
     	final String databasePath = req.getParameter(Parameters.PARAM_DB);
     	resp.setCharacterEncoding("UTF-8");
     	final FendodbSerializationFormat format = getFormat(req, true);
+    	if (format == FendodbSerializationFormat.JSON) { // special case: requesting data in influx format
+    		final String q = req.getParameter("q");
+    		if (q != null && q.toLowerCase().startsWith("select")) {
+				final String subStr1 = q.substring(q.indexOf("from") + 6);
+				final String name = subStr1.substring(0, subStr1.indexOf('\"'));
+				final int colon = name.indexOf(':');
+				final String db = name.substring(0, colon);
+				String path = name.substring(colon+1);
+				if (path.contains("%2F"))
+					path = URLDecoder.decode(path, "UTF-8");
+    	    	try (final CloseableDataRecorder recorder = factory.getExistingInstance(Paths.get(db))) {
+    	    		if (recorder == null) {
+    		    		resp.sendError(HttpServletResponse.SC_NOT_FOUND, "Database not found");
+    		    		return;
+    	    		}
+    	    		final FendoTimeSeries ts = recorder.getRecordedDataStorage(path);
+    	    		if (ts == null) {
+    		    		resp.sendError(HttpServletResponse.SC_NOT_FOUND, "Timeseries not found");
+    		    		return;
+    	    		}
+    	    		serializeToInfluxJson(ts, resp.getWriter(), q, req);
+    	    	}
+	    		return;
+    		}
+    	}
     	if (databasePath == null || databasePath.trim().isEmpty()) {
     		outputDatabaseInstances(resp, getFormat(req, true));
     		setContent(resp, format);
@@ -815,5 +843,111 @@ public class RecordedDataServlet extends HttpServlet {
         return isXml ? FendodbSerializationFormat.XML :
          	isJson ? FendodbSerializationFormat.JSON : FendodbSerializationFormat.CSV;
     }
+    
+    private static long getTime(String query, int idx, boolean startOrEnd) {
+    	if (idx < 0)
+    		return startOrEnd ? Long.MIN_VALUE : Long.MAX_VALUE;
+    	final String sub = query.substring(idx + 8);
+    	final StringBuilder sb = new StringBuilder();
+    	for (int i=0; i<sub.length(); i++) {
+    		final char c = sub.charAt(i);
+    		if (!Character.isDigit(c))
+    			break;
+    		sb.append(c);
+    	}
+    	return Long.parseLong(sb.toString());
+    }
+    
+    private final void serializeToInfluxJson(final FendoTimeSeries timeSeries, final PrintWriter writer, 
+    		final String query, final HttpServletRequest req) throws IOException {
+    	final long start = getTime(query, query.indexOf(" time > "), true);
+    	final long end = getTime(query, query.indexOf(" time < "), false);
+    	serializeToInfluxJson(timeSeries.iterator(start, end), writer, timeSeries.getPath(), getIndentFactor(req), getMaxNrValues(req));
+    }
+    
+    /*
+     * Output:
+     * [{
+		  "columns": ["time", "myTestThermostat/temperatureSensor/deviceFeedback/setpoint"],
+		  "points": [
+			  [1540938247494, 21, 294.1499938964844],
+			  [1540938267977, 21, 294.1499938964844],
+			  [1540938271041, 31.899993896484375, 305.04998779296875],
+			  [1540938273991, 12.399993896484375, 285.54998779296875],
+			  [1540938277726, 38.20001220703125, 311.3500061035156]
+		  ]
+	  }]
+     */
+    private static void serializeToInfluxJson(final Iterator<SampledValue> values, final PrintWriter writer, final String label, 
+    		final int indentFactor, int maxNrValues) throws IOException {
+    	final boolean doIndent = indentFactor > 0;
+    	final String indent;
+    	if (!doIndent)
+    		indent = null;
+    	else
+    		indent = IntStream.range(0, indentFactor).mapToObj(i -> " ").collect(Collectors.joining());
+    	writer.write('[');
+    	writer.write('{');
+    	if (doIndent) {
+    		writer.write('\n');
+    		writer.write(indent);
+    	}
+    	writer.write("\"columns\": [\"time\", \"");
+    		writer.write(label);
+    		writer.write('\"');
+    		writer.write(']');
+    		writer.write(',');
+    	if (doIndent) {
+    		writer.write('\n');
+    		writer.write(indent);
+    	}
+    	writer.write("\"points\": [");
+    	int cnt = 0;
+    	while (values.hasNext() && cnt++ < maxNrValues) {
+    		if (doIndent) {
+    			writer.write('\n');
+        		writer.write(indent);
+        		writer.write(indent);
+    		}
+    		final SampledValue sv = values.next();
+    		writer.write('[');
+    		writer.write(String.valueOf(sv.getTimestamp()));
+    		writer.write(',');
+    		writer.write(' ');
+    		writer.write(String.valueOf(sv.getValue().getFloatValue()));
+    		writer.write(']');
+    		if (values.hasNext())
+    			writer.write(',');
+    	}
+    	if (doIndent) {
+    		writer.write('\n');
+    		writer.write(indent);
+    	}
+    	writer.write(']');
+    	if (doIndent)
+    		writer.write('\n');
+    	writer.write('}');
+    	writer.write(']');
+    }
 
+    private static int getIndentFactor(final HttpServletRequest req) {
+    	final String indent = req.getParameter(Parameters.PARAM_INDENT);
+    	int idt = 0;
+    	if (indent == null)
+    		return idt;
+     	try {
+     		idt = Integer.parseInt(indent);
+     	} catch (NumberFormatException e) {}
+     	return idt;
+    }
+    
+    private static int getMaxNrValues(final HttpServletRequest req) {
+    	final String maxVals = req.getParameter(Parameters.PARAM_MAX);
+    	int max = 10000;
+        try {
+        	max = Integer.parseInt(maxVals);
+        } catch (NullPointerException | NumberFormatException e) {}
+        return max;
+    }
+    
 }
