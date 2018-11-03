@@ -19,11 +19,13 @@ import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.RandomAccessFile;
+import java.io.UnsupportedEncodingException;
 import java.net.URLDecoder;
 import java.nio.channels.FileLock;
 import java.nio.channels.OverlappingFileLockException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.security.AccessController;
 import java.security.PrivilegedActionException;
 import java.security.PrivilegedExceptionAction;
@@ -153,7 +155,7 @@ public class SlotsDb implements CloseableDataRecorder {
 			return null;
 		});
 		try {
-			final boolean parseFolders = Files.exists(dbBaseFolder) && (!Files.exists(slotsDbStoragePath) ||
+			boolean parseFolders = Files.exists(dbBaseFolder) && (!Files.exists(slotsDbStoragePath) ||
 					(configuration != null && configuration.isReadFolders()));
 			this.clock = clock;
 			this.path = dbBaseFolder;
@@ -178,11 +180,15 @@ public class SlotsDb implements CloseableDataRecorder {
 			final FendoDbConfiguration persistedConfig =
 				(!slotsDbStorages.isEmpty() || configuration == null) ? readConfig(persistentConfig) : null;
 			this.config = buildFinalConfiguration(configuration, persistedConfig, path, hardConfigReset, slotsDbStorages.isEmpty());
+			if (!parseFolders && config.isReadFolders()) {
+				final Map<String, RecordedDataConfiguration> newConfigs = parseFolders(slotsDbStorages.keySet());
+				newConfigs.entrySet().forEach(entry -> slotsDbStorages.put(entry.getKey(), new SlotsDbStorage(entry.getKey(), entry.getValue(), this)));
+				parseFolders = !newConfigs.isEmpty();
+			}
 			this.proxy = new FileObjectProxy(dbBaseFolder, clock, config);
-			final FendoDbConfiguration nextConfig = FendoDbConfigurationBuilder.getInstance(config)
-					.setParseFoldersOnInit(false)
-					.build();
-			persistConfig(persistentConfig, nextConfig);
+			persistConfig(persistentConfig, config);
+			if (parseFolders)
+				persistSlotsDbStorages();
 			final long tagsFlush = config.getFlushPeriod() > 0 ? config.getFlushPeriod() : 5000;
 			this.tagsPersistence = new DelayedTask(new Runnable() {
 
@@ -262,13 +268,16 @@ public class SlotsDb implements CloseableDataRecorder {
 				!dbEmpty ? persistedConfiguration.getFolderCreationTimeUnit() :
 				passedConfiguration != null ? passedConfiguration.getFolderCreationTimeUnit() :
 				ChronoUnit.DAYS;
+		final boolean parseFolderOnInit = passedConfiguration != null ? passedConfiguration.isReadFolders() :
+			persistedConfiguration != null ? persistedConfiguration.isReadFolders() : false;
 		final FendoDbConfiguration baseConfig = persistedConfiguration != null ? persistedConfiguration : passedConfiguration; // may be null!
 		final FendoDbConfigurationBuilder builder =
 				FendoDbConfigurationBuilder.getInstance(baseConfig); // null arg ok
 		builder
 			.setReadOnlyMode(readOnlyMode)
 			.setUseCompatibilityMode(compatMode)
-			.setTemporalUnit(unit);
+			.setTemporalUnit(unit)
+			.setParseFoldersOnInit(parseFolderOnInit);
 		if (readOnlyMode && (persistedConfiguration == null || persistedConfiguration.isReadOnlyMode())) {
 			builder.setFlushPeriod(0)
 				.setDataLifetimeInDays(0)
@@ -623,32 +632,8 @@ public class SlotsDb implements CloseableDataRecorder {
 			}
 		}
 		if (addFolders && path != null) {
-			try (final Stream<Path> stream = Files.list(path)) {
-				stream.filter(path -> Files.isDirectory(path)).forEach(folder -> {
-					try (final Stream<Path> inner = Files.list(folder)) {
-						inner.forEach(path -> {
-							String filename;
-							try {
-								filename = URLDecoder.decode(path.getFileName().toString(), "UTF-8");
-								if (filename.contains("%2F")) {
-									Files.move(path, path.getParent().resolve(filename));
-									filename = URLDecoder.decode(filename, "UTF-8");
-								}
-							} catch (IOException e) {
-								FileObjectProxy.logger.warn("Reading SlotsDb directory " + path + " failed",e);
-								return;
-							}
-							if (!configurations.containsKey(filename)) {
-								RecordedDataConfiguration rdc = new RecordedDataConfiguration();
-								rdc.setStorageType(StorageType.ON_VALUE_UPDATE); // dummy value
-								configurations.put(filename, rdc); // default config
-							}
-						});
-					} catch (IOException e) {
-						FileObjectProxy.logger.warn("Reading SlotsDb folder failed",e);
-					}
-				});
-			}
+			final Map<String, RecordedDataConfiguration> parsedConfigs = parseFolders(configurations.keySet());
+			configurations.putAll(parsedConfigs);
 		}
 		final Map<String, SlotsDbStorage> map = new ConcurrentHashMap<>();
 		for (Iterator<String> iterator = configurations.keySet().iterator(); iterator.hasNext();) {
@@ -656,6 +641,38 @@ public class SlotsDb implements CloseableDataRecorder {
 			map.put(id, new SlotsDbStorage(id, configurations.get(id), this));
 		}
 		return map;
+	}
+	
+	private final Map<String, RecordedDataConfiguration> parseFolders(final Collection<String> existingConfigs) throws IOException {
+		final Map<String, RecordedDataConfiguration> configs = new HashMap<>();
+		try (final Stream<Path> stream = Files.list(path)) {
+			stream.filter(path -> Files.isDirectory(path)).forEach(folder -> {
+				try (final Stream<Path> inner = Files.list(folder)) {
+					inner.forEach(path -> {
+						String filename;
+						try {
+							filename = URLDecoder.decode(path.getFileName().toString(), "UTF-8");
+							if (filename.contains("%2F")) {
+								final Path target = path.getParent().resolve(filename);
+								if (Files.isDirectory(target))
+									FileUtils.deleteDirectory(target.toFile());
+								Files.move(path, target, StandardCopyOption.REPLACE_EXISTING);
+								filename = URLDecoder.decode(filename, "UTF-8");
+							}
+						} catch (IOException e) {
+							FileObjectProxy.logger.warn("Reading SlotsDb directory {} failed", path,e);
+							return;
+						}
+						if (!existingConfigs.contains(filename)) {
+							configs.put(filename, newConfig()); // default config
+						}
+					});
+				} catch (IOException e) {
+					FileObjectProxy.logger.warn("Reading SlotsDb folder failed",e);
+				}
+			});
+		}
+		return configs;
 	}
 
 	@Override
@@ -833,15 +850,41 @@ public class SlotsDb implements CloseableDataRecorder {
 	
 	@Override
 	public void reloadDays() throws IOException {
-		proxy.folderLock.writeLock().lock();
-		try {
-			proxy.reloadDays();
-		} finally {
-			proxy.folderLock.writeLock().unlock();
+		synchronized (slotsDbStorages) {
+			proxy.folderLock.writeLock().lock();
+			try {
+				final List<Path> newDays = proxy.reloadDays();
+				if (!newDays.isEmpty()) {
+					for (Path d : newDays) {
+						try (final Stream<Path> folders = Files.list(d)) {
+							folders.filter(Files::isDirectory)
+								.map(Path::getFileName)
+								.map(Path::toString)
+								.map(p -> {
+									try {
+										return URLDecoder.decode(p, "UTF-8");
+									} catch (UnsupportedEncodingException e) {
+										throw new RuntimeException(e);
+									}
+								})
+								.filter(path -> !slotsDbStorages.containsKey(path))
+								.forEach(path -> slotsDbStorages.put(path, new SlotsDbStorage(path, newConfig(), this)));
+						}
+					}
+					persistSlotsDbStorages();
+				}
+			} finally {
+				proxy.folderLock.writeLock().unlock();
+			}
 		}
-		
 	}
 
+	private final RecordedDataConfiguration newConfig() {
+		final RecordedDataConfiguration cfg = new RecordedDataConfiguration();
+		cfg.setStorageType(StorageType.ON_VALUE_UPDATE);
+		return cfg;
+	}
+	
 	private boolean deleteDataFrom(final long t0, final boolean beforeOrAfter) throws IOException {
 		synchronized (slotsDbStorages) {
 			// folder lock must be obtained after time series lock

@@ -16,9 +16,12 @@
 package org.smartrplace.logging.fendodb.impl;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.net.URLDecoder;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.time.DateTimeException;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
@@ -37,6 +40,7 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import org.apache.commons.io.FileUtils;
 import org.ogema.core.administration.FrameworkClock;
 import org.ogema.core.channelmanager.measurements.SampledValue;
 import org.ogema.core.recordeddata.RecordedDataConfiguration;
@@ -89,6 +93,7 @@ public final class FileObjectProxy {
 	final int limit_size;
 	private final int max_open_files;
 	private final long dataExpirationCheckInterval;
+	private final boolean readFolders;
 	
 	private final SlotsDbCache cache = new SlotsDbCache();
 
@@ -104,6 +109,7 @@ public final class FileObjectProxy {
 		this.useCompatibilityMode = config.useCompatibilityMode();
 		this.unit = useCompatibilityMode ? ChronoUnit.DAYS : config.getFolderCreationTimeUnit();
 		this.readOnlyMode = config.isReadOnlyMode();
+		this.readFolders = config.isReadFolders();
 		this.clock = clock;
 		if (config.getFlushPeriod() > 0 || config.getDataLifetimeInDays() > 0 || config.getMaxDatabaseSize() > 0)
 			timer = new Timer();
@@ -118,7 +124,7 @@ public final class FileObjectProxy {
 		rootNodeString = rootNodePath.toString();
 		openFilesHM = new ConcurrentHashMap<>();
 		days = loadDays(rootNodePath, useCompatibilityMode);
-		// FIXME if opened in read only mode, no tasks are needed is needed
+		// FIXME if opened in read only mode, no tasks are needed
 		final long flushPeriod = config.getFlushPeriod();
 		if (flushPeriod > 0) {
 			final long flush_period;
@@ -202,10 +208,47 @@ public final class FileObjectProxy {
 
 	/**
 	 * Requires folder write lock
+	 * @return list of new days
 	 * @throws IOException
 	 */
-	final void reloadDays() throws IOException {
+	final List<Path> reloadDays() throws IOException {
+		final List<Path> oldDays = this.days;
+		final int oldSize = oldDays.size();
 		this.days = loadDays(rootNode, useCompatibilityMode);
+		final List<Path> newDays = days.stream()
+			.filter(d -> !oldDays.contains(d))
+			.collect(Collectors.toList());
+		if (readFolders) {
+			final int newSize = days.size();
+			checkEncodings(Math.max(newSize, newSize-oldSize+1));
+		}
+		return newDays;
+	}
+	
+	private final void checkEncodings(int lastXDays) throws IOException {
+		for (int i = 0; i < lastXDays; i++) {
+			final Path day = days.get(days.size()-i-1);
+			try (final Stream<Path> stream = Files.list(day)) {
+				final List<Path> wrongEncodings = stream.filter(Files::isDirectory)
+					.filter(fl -> fl.getFileName().toString().contains("%252F"))
+					.collect(Collectors.toList());
+				if (!wrongEncodings.isEmpty()) {
+					clearOpenFilesHashMap();
+					wrongEncodings.forEach(fl -> {
+						try {
+							final Path target = fl.getParent().resolve(URLDecoder.decode(fl.getFileName().toString(), "UTF-8"));
+							if (Files.isDirectory(target))
+								FileUtils.deleteDirectory(target.toFile());
+							Files.move(fl, target, StandardCopyOption.REPLACE_EXISTING);
+						} catch (IOException e) {
+							throw new UncheckedIOException(e);
+						}
+					});
+				}
+			} catch (UncheckedIOException e) {
+				throw e.getCause();
+			}
+		}
 	}
 	
 	/*

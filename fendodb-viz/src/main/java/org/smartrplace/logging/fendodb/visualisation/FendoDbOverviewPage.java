@@ -91,6 +91,7 @@ public class FendoDbOverviewPage implements LazyWidgetPage {
 		private final Label maxSizeField;
 		private final Label flushPeriodField;
 		private final Label maxOpenFilesField;
+		private final Label parseFolderOnInitField;
 		private final WidgetGroup dependentFields;
 		private final ButtonConfirm closeDb;
 	
@@ -100,6 +101,7 @@ public class FendoDbOverviewPage implements LazyWidgetPage {
 		private final Checkbox newCompatModeField;
 		private final TemplateDropdown<TemporalUnit> newUnitField;
 		private final Checkbox newReadOnlyModeField;
+		private final Checkbox newParseFolderOnInitField;
 		private final ValueInputField<Integer> newMaxDaysField;
 		private final ValueInputField<Integer> newMaxSizeField;
 		private final ValueInputField<Long> newFlushPeriodField;
@@ -194,6 +196,13 @@ public class FendoDbOverviewPage implements LazyWidgetPage {
 					return String.valueOf(config.getMaxOpenFolders());
 				}
 			};
+			this.parseFolderOnInitField = new ConfigurationLabel(page, "parseFolderOnInitField", slotsSelector) {
+				
+				@Override
+				String getValue(FendoDbConfiguration config) {
+					return String.valueOf(config.isReadFolders());
+				}
+			};
 			this.closeDb = new ButtonConfirm(page, "buttonConfirm") {
 	
 				@Override
@@ -279,6 +288,8 @@ public class FendoDbOverviewPage implements LazyWidgetPage {
 			};
 			this.newReadOnlyModeField = new Checkbox(page, "newReadOnlyModeField");
 			newReadOnlyModeField.setDefaultList(Collections.singletonMap("", false));
+			this.newParseFolderOnInitField = new Checkbox(page, "newParseFolderOnInitField");
+			newParseFolderOnInitField.setDefaultList(Collections.singletonMap("", true));
 			this.newMaxDaysField = new ValueInputField<>(page, "newMaxDaysField", Integer.class);
 			newMaxDaysField.setDefaultLowerBound(0);
 			newMaxDaysField.setDefaultNumericalValue(0);
@@ -307,6 +318,7 @@ public class FendoDbOverviewPage implements LazyWidgetPage {
 						alert.showAlert("A database for the path " + path + " already exists", false, req);
 						return;
 					}
+					final boolean parseOnInit = newParseFolderOnInitField.getCheckboxList(req).get("");
 					final boolean readOnlyMode = newReadOnlyModeField.getCheckboxList(req).get("");
 					final TemporalUnit unit = newUnitField.getSelectedItem(req);
 					final Integer maxDays = newMaxDaysField.getNumericalValue(req);
@@ -324,7 +336,7 @@ public class FendoDbOverviewPage implements LazyWidgetPage {
 						.setDataLifetimeInDays(maxDays)
 						.setFlushPeriod(flushPeriod * 1000)
 						.setMaxOpenFolders(maxOpenFiles)
-						.setParseFoldersOnInit(true)
+						.setParseFoldersOnInit(parseOnInit)
 						.setMaxDatabaseSize(maxSize)
 						.setTemporalUnit(unit)
 						.setUseCompatibilityMode(useCompatMode)
@@ -640,7 +652,7 @@ public class FendoDbOverviewPage implements LazyWidgetPage {
 						.setDataLifetimeInDays(maxDays)
 						.setFlushPeriod(flushPeriod * 1000)
 						.setMaxOpenFolders(maxOpenFiles)
-						.setParseFoldersOnInit(true)
+						.setParseFoldersOnInit(true) // FIXME?
 						.setMaxDatabaseSize(maxSize)
 						.setTemporalUnit(unit)
 						.setUseCompatibilityMode(useCompatMode)
@@ -672,7 +684,7 @@ public class FendoDbOverviewPage implements LazyWidgetPage {
 			};
 	
 			this.dependentFields = page.registerWidgetGroup("dependentFields", Arrays.asList(
-					readOnlyModeField, compatModeField, unitField, flushPeriodField, maxDaysField, maxSizeField, maxOpenFilesField, closeDb, reloadDaysSubmit,
+					readOnlyModeField, compatModeField, unitField, flushPeriodField, maxDaysField, maxSizeField, maxOpenFilesField, parseFolderOnInitField, closeDb, reloadDaysSubmit,
 					copyReadOnlyModeField, copyCompatModeField, copyUnitField, copyFlushPeriodField, copyMaxDaysField, copyMaxSizeField, copyMaxOpenFilesField,
 					updateReadOnlyModeField, updateCompatModeField, updateUnitField, updateFlushPeriodField, updateMaxDaysField, updateMaxSizeField, updateMaxOpenFilesField
 				));
@@ -684,10 +696,11 @@ public class FendoDbOverviewPage implements LazyWidgetPage {
 		private final void buildPage() {
 			final PageSnippet body = new PageSnippet(page, "newPopupBody", true);
 			int row = 0;
-			body.append(new StaticTable(9, 2)
+			body.append(new StaticTable(10, 2)
 				.setContent(row, 0, "Database path relative to rundir").setContent(row++, 1, newDbFolder)
 				.setContent(row, 0, "Open in read only mode?").setContent(row++, 1, newReadOnlyModeField)
 				.setContent(row, 0, "Use compatibility mode?").setContent(row++, 1, newCompatModeField)
+				.setContent(row, 0, "Parse folders on init?").setContent(row++, 1, newParseFolderOnInitField)
 				.setContent(row, 0, "Folder time interval").setContent(row++, 1, newUnitField)
 				.setContent(row, 0, "Max data lifetime (days)").setContent(row++, 1, newMaxDaysField)
 				.setContent(row, 0, "Max data size (MB)").setContent(row++, 1, newMaxSizeField)
@@ -734,7 +747,7 @@ public class FendoDbOverviewPage implements LazyWidgetPage {
 			row = 0;
 			page.append(header).linebreak()
 				.append(alert)
-				.append(new StaticTable(13, 2, new int[] {3,3})
+				.append(new StaticTable(14, 2, new int[] {3,3})
 						.setContent(row, 0, "Select FendoDB instance").setContent(row++, 1, slotsSelector)
 						.setContent(row, 0, "Open in read only mode?").setContent(row++, 1, readOnlyModeField)
 						.setContent(row, 0, "Use compatibility mode?").setContent(row++, 1, compatModeField)
@@ -743,6 +756,7 @@ public class FendoDbOverviewPage implements LazyWidgetPage {
 						.setContent(row, 0, "Max data lifetime").setContent(row++, 1, maxDaysField)
 						.setContent(row, 0, "Max db size").setContent(row++, 1, maxSizeField)
 						.setContent(row, 0, "Max open files").setContent(row++, 1, maxOpenFilesField)
+						.setContent(row, 0, "Parse folders on init").setContent(row++, 1, parseFolderOnInitField)
 						.setContent(row, 0, "Update settings").setContent(row++, 1, updatePopupTrigger)
 						.setContent(row, 0, "Reload days folders").setContent(row++, 1, reloadDaysSubmit)
 						.setContent(row, 0, "Close instance").setContent(row++, 1, closeDb)
