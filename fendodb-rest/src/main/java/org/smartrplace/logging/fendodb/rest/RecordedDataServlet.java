@@ -368,7 +368,7 @@ public class RecordedDataServlet extends HttpServlet {
     	final FendodbSerializationFormat format = getFormat(req, true);
     	if (format == FendodbSerializationFormat.JSON) { // special case: requesting data in influx format
     		final String q = req.getParameter("q");
-    		if (q != null && q.toLowerCase().startsWith("select")) {
+    		if (q != null && q.toLowerCase().startsWith("select") && "/series".equalsIgnoreCase(req.getPathInfo())) {
 				final String subStr1 = q.substring(q.indexOf("from") + 6);
 				final String name = subStr1.substring(0, subStr1.indexOf('\"'));
 				final int colon = name.indexOf(':');
@@ -378,12 +378,12 @@ public class RecordedDataServlet extends HttpServlet {
 					path = URLDecoder.decode(path, "UTF-8");
     	    	try (final CloseableDataRecorder recorder = factory.getExistingInstance(Paths.get(db))) {
     	    		if (recorder == null) {
-    		    		resp.sendError(HttpServletResponse.SC_NOT_FOUND, "Database not found");
+    		    		resp.sendError(HttpServletResponse.SC_NOT_FOUND, "Database not found: " + db);
     		    		return;
     	    		}
     	    		final FendoTimeSeries ts = recorder.getRecordedDataStorage(path);
     	    		if (ts == null) {
-    		    		resp.sendError(HttpServletResponse.SC_NOT_FOUND, "Timeseries not found");
+    		    		resp.sendError(HttpServletResponse.SC_NOT_FOUND, "Timeseries not found: " + path);
     		    		return;
     	    		}
     	    		serializeToInfluxJson(ts, resp.getWriter(), q, req);
@@ -858,10 +858,10 @@ public class RecordedDataServlet extends HttpServlet {
     	return Long.parseLong(sb.toString());
     }
     
-    private final void serializeToInfluxJson(final FendoTimeSeries timeSeries, final PrintWriter writer, 
+    private static void serializeToInfluxJson(final FendoTimeSeries timeSeries, final PrintWriter writer, 
     		final String query, final HttpServletRequest req) throws IOException {
-    	final long start = getTime(query, query.indexOf(" time > "), true);
-    	final long end = getTime(query, query.indexOf(" time < "), false);
+    	final long start = getTime(query, query.indexOf(" time > "), true) * 1000;
+    	final long end = getTime(query, query.indexOf(" time < "), false) * 1000;
     	serializeToInfluxJson(timeSeries.iterator(start, end), writer, timeSeries.getPath(), getIndentFactor(req), getMaxNrValues(req));
     }
     
