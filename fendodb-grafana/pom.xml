@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+	
+	<parent>
+		<groupId>org.smartrplace.logging</groupId>
+	    <artifactId>fendodb-base</artifactId>
+	    <version>0.0.4-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>fendodb-grafana</artifactId>
+    <name>FendoDb Grafana viz</name>
+    <description>FendoDb visualisation based on Grafana</description>
+	<packaging>bundle</packaging>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.felix</groupId>
+                <artifactId>maven-bundle-plugin</artifactId>
+                 <configuration>
+                	<instructions>
+                		<Export-Package></Export-Package>
+                	</instructions>
+                </configuration>
+				<!-- TODO require capability grafana-base -->
+            </plugin>
+        </plugins>
+    </build>
+
+    <dependencies>
+        <dependency>
+            <groupId>org.osgi</groupId>
+            <artifactId>osgi.core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.osgi</groupId>
+            <artifactId>osgi.cmpn</artifactId>
+            <version>7.0.0</version><!-- required for multipart upload config -->
+        </dependency>
+	    <dependency>
+            <groupId>org.smartrplace.logging</groupId>
+            <artifactId>fendodb-api</artifactId>
+            <exclusions>
+            	<exclusion>
+            		<groupId>javax.servlet</groupId>
+            		<artifactId>servlet-api</artifactId>
+            	</exclusion>
+            </exclusions>
+        </dependency>
+		<dependency>
+		    <groupId>javax.servlet</groupId>
+		    <artifactId>javax.servlet-api</artifactId>
+		    <version>3.1.0</version>
+		    <scope>provided</scope>
+		</dependency>
+        <dependency>
+            <groupId>org.ogema.tools</groupId>
+            <artifactId>resource-utils</artifactId>
+            <exclusions>
+            	<exclusion>
+            		<groupId>javax.servlet</groupId>
+            		<artifactId>servlet-api</artifactId>
+            	</exclusion>
+            </exclusions>
+        </dependency>
+        <!-- compile time only dependency -->
+		<dependency>
+			<groupId>org.smartrplace.logging</groupId>
+			<artifactId>fendodb-rest</artifactId>
+			<version>${project.version}</version>
+			<exclusions>
+            	<exclusion>
+            		<groupId>javax.servlet</groupId>
+            		<artifactId>servlet-api</artifactId>
+            	</exclusion>
+            </exclusions>
+		</dependency>
+    </dependencies>
+
+</project>

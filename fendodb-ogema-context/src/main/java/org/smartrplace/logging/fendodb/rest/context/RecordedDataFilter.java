@@ -20,6 +20,7 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.security.AccessControlContext;
+
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
@@ -29,11 +30,15 @@ import org.ogema.accesscontrol.RestAccess;
 import org.osgi.service.component.ComponentServiceObjects;
 import org.osgi.service.component.annotations.Component;
 import org.osgi.service.component.annotations.Reference;
+import org.osgi.service.component.annotations.ReferenceCardinality;
+import org.osgi.service.component.annotations.ReferencePolicy;
+import org.osgi.service.component.annotations.ReferencePolicyOption;
 import org.osgi.service.http.context.ServletContextHelper;
 import org.osgi.service.http.whiteboard.HttpWhiteboardConstants;
 import org.smartrplace.logging.fendodb.accesscontrol.FendoDbAccessControl;
 import org.smartrplace.logging.fendodb.permissions.FendoDbPermission;
 import org.smartrplace.logging.fendodb.rest.RecordedDataServlet;
+import org.smartrplace.tools.servlet.api.AppAuthentication;
 
 @Component(
 		service=ServletContextHelper.class,
@@ -50,12 +55,20 @@ public class RecordedDataFilter extends ServletContextHelper {
 	private ComponentServiceObjects<PermissionManager> permManService;
     @Reference
     private ComponentServiceObjects<RestAccess> restAccessService;
+    @Reference(
+    		service=AppAuthentication.class
+    		/*
+    		policy=ReferencePolicy.DYNAMIC,
+    		policyOption=ReferencePolicyOption.GREEDY,
+    		cardinality=ReferenceCardinality.OPTIONAL
+    		*/
+    )
+    private volatile ComponentServiceObjects<AppAuthentication> appAuthService;
 	
     @Override
     public boolean handleSecurity(HttpServletRequest request, HttpServletResponse response) throws IOException {
-    	final RestAccess restAcc = restAccessService.getService();
     	try {
-    		final AccessControlContext ctx = restAcc.getAccessContext(request, response);
+    		final AccessControlContext ctx = getContext(request);
     		if (ctx == null) {
     			request.removeAttribute(REMOTE_USER);
     			response.sendError(HttpServletResponse.SC_UNAUTHORIZED);
@@ -72,8 +85,33 @@ public class RecordedDataFilter extends ServletContextHelper {
     		request.removeAttribute(REMOTE_USER);
 			response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
 			return false;
-		} finally {
-    		restAccessService.ungetService(restAcc);
+    	}
+    }
+    
+    private AccessControlContext getContext(final HttpServletRequest req) throws ServletException, IOException {
+    	final RestAccess ra = restAccessService.getService();
+    	try {
+    		final AccessControlContext ctx = ra.getAccessContext(req, null);
+    		if (ctx != null)
+    			return ctx;
+    	} catch (NullPointerException expected) { 
+    	} finally {
+    		restAccessService.ungetService(ra);
+    	}
+    	final ComponentServiceObjects<AppAuthentication> appAuthService = this.appAuthService;
+    	if (appAuthService == null)
+    		return null;
+    	final String token = req.getHeader("Authorization");
+    	final String token1;
+    	if (token == null || !token.toLowerCase().startsWith("bearer "))
+    		token1 = req.getParameter("pw");
+    	else 
+    		token1 = token.substring("bearer ".length());
+    	final AppAuthentication appAuth = appAuthService.getService();
+    	try {
+    		return appAuth.getContext(token1.toCharArray());
+    	} finally {
+    		appAuthService.ungetService(appAuth);
     	}
     }
     

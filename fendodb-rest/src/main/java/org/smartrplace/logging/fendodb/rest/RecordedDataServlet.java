@@ -844,10 +844,21 @@ public class RecordedDataServlet extends HttpServlet {
          	isJson ? FendodbSerializationFormat.JSON : FendodbSerializationFormat.CSV;
     }
     
-    private static long getTime(String query, int idx, boolean startOrEnd) {
+    private long getTime(String query, int idx, boolean startOrEnd) {
     	if (idx < 0)
-    		return startOrEnd ? Long.MIN_VALUE : Long.MAX_VALUE;
+    		return startOrEnd ? Long.MIN_VALUE/1000 : Long.MAX_VALUE/1000;
     	final String sub = query.substring(idx + 8);
+    	if (sub.startsWith("now()")) {
+    		final long now = now();
+    		final char next = nextChar(sub, 5);
+    		if (next != '-' && next != '+')
+    			return now / 1000;
+    		final long duration = parseDuration(sub.substring(7));
+    		if (next == '-')
+    			return (now - duration)/1000;
+    		else
+    			return (now + duration)/1000;
+    	}
     	final StringBuilder sb = new StringBuilder();
     	for (int i=0; i<sub.length(); i++) {
     		final char c = sub.charAt(i);
@@ -858,11 +869,80 @@ public class RecordedDataServlet extends HttpServlet {
     	return Long.parseLong(sb.toString());
     }
     
-    private static void serializeToInfluxJson(final FendoTimeSeries timeSeries, final PrintWriter writer, 
+    private static char nextChar(final String str, final int idxBegin) {
+    	int idx = idxBegin-1;
+    	final int l = str.length();
+    	while (idx++ < l-1) {
+    		if (str.charAt(idx) == ' ')
+    			continue;
+    		return str.charAt(idx);
+    	}
+    	return ' ';
+    }
+    
+    /**
+     * 
+     * @param queryPart of the form '30d', '5m', etc
+     * @return
+     * 		duration in millis
+     */
+    private static long parseDuration(final String queryPart) {
+    	final StringBuilder sb =new StringBuilder();
+    	char identifier = ' ';
+    	for (char c : queryPart.toCharArray()) {
+    		if (c == ' ')
+    			continue;
+    		if (Character.isDigit(c))
+    			sb.append(c);
+    		else {
+    			identifier = c;
+    			break;
+    		}
+    	}
+    	final long duration = Long.parseLong(sb.toString());
+    	final long multiplier;
+    	switch (identifier) {
+    	case 'y':
+    		multiplier = 365 * 24 * 60 * 60 * 1000;
+    		break;
+    	case 'M':
+    		multiplier = 30 * 24 * 60 * 60 * 1000;
+    		break;
+    	case 'd':
+    		multiplier = 24 * 60 * 60 * 1000;
+    		break;
+    	case 'h':
+    		multiplier = 60 * 60 * 1000;
+    		break;
+    	case 'm':
+    		multiplier = 60 * 1000;
+    		break;
+    	case 's':
+    		multiplier = 1000;
+    		break;
+    	default:
+    		throw new IllegalArgumentException("Unknown duration " + queryPart);
+    	}
+    	return multiplier * duration;
+    }
+    
+    private void serializeToInfluxJson(final FendoTimeSeries timeSeries, final PrintWriter writer, 
     		final String query, final HttpServletRequest req) throws IOException {
     	final long start = getTime(query, query.indexOf(" time > "), true) * 1000;
     	final long end = getTime(query, query.indexOf(" time < "), false) * 1000;
     	serializeToInfluxJson(timeSeries.iterator(start, end), writer, timeSeries.getPath(), getIndentFactor(req), getMaxNrValues(req));
+    }
+    
+    private final long now() {
+    	final ComponentServiceObjects<FrameworkClock> clockService = this.clockService;
+    	final FrameworkClock clock = clockService != null ? clockService.getService() : null;
+    	if (clock == null)
+    		return System.currentTimeMillis();
+    	try {
+    		return clock.getExecutionTime();
+    	} finally {
+    		clockService.ungetService(clock);
+    	}
     }
     
     /*

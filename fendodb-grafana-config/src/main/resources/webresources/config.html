@@ -1,0 +1,99 @@
+<!DOCTYPE HTML>
+
+<html>
+
+<head>
+	<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+	<title>FendoDB Grafana configuration</title>
+</head>
+
+<body>
+	<h2>Configurations</h2>
+		<div style="display:flex; ">
+			<span>Update view</span><input type="button" value="Update" id="updateConfigsView" onclick="updateConfigs();" style="margin-left:1em;">
+		</div>
+		<br>
+		<div id="configs" style="display:grid; grid-template-columns: auto auto auto auto 1fr; grid-column-gap:1em;  grid-row-gap:1em;">
+			  <span style="font-weight:bold;">Config id</span><span style="font-weight:bold;">Open</span>
+			  <span style="font-weight:bold;">Edit</span><span style="font-weight:bold;">Delete</span><div></div><!-- header row-->
+		</div>
+	<h2>Upload configuration</h2>
+	<!-- TODO servlet address -->
+	<!--<form method="post" id="uploadForm" enctype="multipart/form-data" action="/rest/fendodb/config-upload">-->
+	<!-- TODO update grid -->
+	<form method="post" id="uploadForm" enctype="multipart/form-data" action="/org/smartrplace/logging/fendodb/grafana/upload">
+		 <div style="display:grid; grid-column-gap:1em; grid-row-gap:1em; grid-template-columns: auto auto 1fr;">
+		  	 <label for="file">Select a json file (*.json).</label>
+		     <input name="file" type="file" size="50" accept="application/json">   
+		     <div></div>
+		     <div></div><input type="submit" value="Upload"><div></div>
+		 </div>
+	</form>
+    <script>
+		 const openPage = (id, page) => window.open(page  + "?config=" + id, "_blank");
+		 const deleteConfig = (id) => {
+		 	fetch("/org/smartrplace/logging/fendodb/grafana/servlet?config=" + id + "&" + otp_uri_ext, {
+    		   		credentials:"same-origin",
+    		   		method: "delete"
+    		   }).then(response => {
+    		   		if (!response.ok)
+					    throw Error(response.statusText); // TODO show alert instead
+					else					
+						return response.text();
+    		   }).then(response => {
+    		   		updateConfigs();
+    		   });
+		 };
+    	 const setConfigsGrid = array => {
+    	 		console.log(array);
+    	 		const configsEl = document.getElementById("configs");
+    	 		const existingEntries = configsEl.querySelectorAll("[data-cfg]");
+    	 	 	const deletionList = []; // TODO
+    	 	 	const frag = document.createDocumentFragment();
+    	 	 	array
+    	 	 		.filter(id => Array.from(existingEntries).find(e => e.dataset.cfg === id) === undefined)// TODO
+    	 	 		.forEach(id => {
+    	 	 			const idSpan = document.createElement("span");
+    	 	 			idSpan.innerText = id;
+    	 	 			const link = document.createElement("input");
+    	 	 			link.type = "button";
+    	 	 			link.addEventListener("click", () => openPage(id, "../viz/index.html"));
+    	 	 			link.value = "Open";
+    	 	 			const linkEdit = document.createElement("input");
+    	 	 			linkEdit.type = "button";
+    	 	 			linkEdit.addEventListener("click", () => openPage(id, "edit.html"));
+    	 	 			linkEdit.value = "Edit";
+    	 	 			const del = document.createElement("input");
+    	 	 			del.type = "button";
+    	 	 			del.value = "Delete";
+    	 	 			del.addEventListener("click", () => deleteConfig(id));
+    	 	 			const dummy = document.createElement("div");
+    	 	 			[idSpan, link, linkEdit, del, dummy].forEach(el => el.dataset.cfg = id);
+    	 	 			frag.appendChild(idSpan);
+    	 	 			frag.appendChild(link);
+    	 	 			frag.appendChild(linkEdit);
+    	 	 			frag.appendChild(del);
+    	 	 			frag.appendChild(dummy);
+    	 	 		});
+    	 	 	configsEl.appendChild(frag);
+    	 	 	
+    	 };
+    	 function updateConfigs() {
+    		   fetch("/org/smartrplace/logging/fendodb/grafana/servlet?target=configs&" + otp_uri_ext, {
+    		   		credentials:"same-origin"
+    		   }).then(response => {
+    		   		if (!response.ok)
+					    throw Error(response.statusText); // TODO show alert instead
+					else					
+						return response.json();
+    		   })
+    		   .then(setConfigsGrid);
+    	 };
+    	 updateConfigs();
+     	 // FIXME use basic auth
+    	 const form = document.getElementById("uploadForm");
+    	 form.action = form.action + "?" + otp_uri_ext;
+    </script>
+</body>
+
+</html>

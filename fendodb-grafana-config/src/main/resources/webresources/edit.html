@@ -1,0 +1,78 @@
+<!DOCTYPE HTML>
+
+<html>
+
+<head>
+	<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+	<title>FendoDB Grafana configuration</title>
+</head>
+
+<body>
+	<h2 id="header">Edit Configuration</h2>
+	<textarea id="json" style="width:75vw; height:75vh;">
+	</textarea>
+	<br>
+	<span id="alert" style="display:none; width:100vw; background-color:lightblue;"></span>
+	<br>
+	<div style="display: flex; column-gap: 1em;">
+		  <span style="margin-right:1em;">Save changes</span><input type="button" value="Save" onclick="save();">
+	</div> 
+    <script>
+    	 let config;
+    	 let jsonGlobal;
+    	 let alertTimeout;
+    	 function showAlert(text) {
+    	 	  if (alertTimeout)
+    	 	  	  window.clearTimeout(alertTimeout);
+    	 	  const alert = document.getElementById("alert");
+    	 	  alert.innerText = text;
+    	 	  alert.style.display="block";
+    	 	  alertTimeout = setTimeout(() => {
+    	 	  		alert.style.display="none";
+    	 	  		alert.innerText="";
+    	 	  	}, 6000);
+    	 }
+    	 function save() {
+    	 	 if (!config || !jsonGlobal)
+    	 	     return;
+    	 	 const content = JSON.parse(document.getElementById("json").value); // FIXME show alert if content is not valid json
+    	 	 const formData = new FormData();
+    	 	// formData.append("file", content, config + ".json");
+    	 	 const blob = new Blob([JSON.stringify(content)], { type: "application/json" });
+    	 	 formData.append("file", blob, config + ".json");
+    	 	 fetch("/org/smartrplace/logging/fendodb/grafana/upload?" + otp_uri_ext, {
+    	 	 	 method: "post",
+    	 	 	 body: formData
+    	 	 }).then(response => {
+    	 	     	if (!response.ok)
+					    throw Error(response.statusText); // TODO show alert instead
+					else					
+						return response.text();
+    	 	 }).then(text => showAlert("Saved configuration " + config))
+    	 	 .catch(error => showAlert("Saving failed: " + error));
+    	 	
+    	 }
+		 const s = new URLSearchParams(window.location.search);
+		 const cfg = s.get("config");
+		 if (cfg !== null) {
+		 	 config = cfg;
+		 	 const h = document.getElementById("header");
+		 	 h.innerText = h.innerText + " " + cfg;
+		 	 const update = json => {
+		 	 	jsonGlobal = json;
+		 	 	document.getElementById("json").innerText = JSON.stringify(json, null, 4); // pretty print
+		 	 };
+		 	 fetch("/org/smartrplace/logging/fendodb/grafana/servlet?target=config&config=" + cfg + "&" + otp_uri_ext, {
+    		   		credentials:"same-origin",
+    		   		method: "get"
+    		   }).then(response => {
+    		   		if (!response.ok)
+					    throw Error(response.statusText); // TODO show alert instead
+					else					
+						return response.json();
+    		   }).then(update);
+		 }
+    </script>
+</body>
+
+</html>
