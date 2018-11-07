@@ -506,12 +506,6 @@ public class RecordedDataServlet extends HttpServlet {
     	final String[] ids2 = req.getParameterValues(Parameters.PARAM_ID);
     	final String[] idsExcluded = req.getParameterValues(Parameters.PARAM_ID_EXCLUDED);
     	final SearchFilterBuilder builder = SearchFilterBuilder.getInstance();
-//    	System.out.println(" Request params:");
-//    	System.out.println("    Props: " + Arrays.toString(properties));
-//    	System.out.println("    Tags: " + Arrays.toString(tags));
-//    	System.out.println("    Ids: " + Arrays.toString(ids2));
-//    	System.out.println("    Excluded: " + Arrays.toString(idsExcluded));
-
     	if (properties != null) {
     		final Map<String,Collection<String>> map = new HashMap<>(Math.max(4, properties.length));
     		Arrays.stream(properties)

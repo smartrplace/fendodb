@@ -26,24 +26,97 @@ return function(callback) {
 		console.log("Config parameter missing");
 		return;
 	}
+	let token = null;
 	const config = search.get("config");
-	$.ajax({
-        method: "GET",
-	    url: "/org/smartrplace/tools/app/auth?user=" + otusr + "&pw=" + otpwd,
-	    Accept: "text/plain"
-	}).done(token => {
-		$.ajax({
+	fetch("/org/smartrplace/tools/app/auth?user=" + otusr + "&pw=" + otpwd, {
+		 method: "GET",
+		 credentials: "same-origin",
+         headers: {
+             Accept: "text/plain"
+         }
+	}).then(response => {
+		if (!response.ok)
+			return Promise.reject("Request failed "  + response.status + ": " + response.statusText);
+		return response.text();
+	}).then(tokenResponse => {
+		token = tokenResponse;
+		return fetch("/org/smartrplace/logging/fendodb/grafana/servlet?target=config&config=" + config + "&user=" + otusr + "&pw=" + otpwd, {
 	        method: "GET",
-		    url: "/org/smartrplace/logging/fendodb/grafana/servlet?target=config&config=" + config + "&user=" + otusr + "&pw=" + otpwd,
-		    contentType: "application/json"
+	        credentials: "same-origin",
+	        headers: {
+	        	Accept: "application/json"
+	        }
 		})
-		.done(dashboardJson => {
-			// when dashboard is composed call the callback function and pass the dashboard
-			otpwd = token; // fendo REST servlet is not accessible with standard otp, instead we need to use the token
-			otp_uri_ext = "user=" + otusr + "&pw=" + otpwd; 
-			console.log("Dashboard", dashboardJson);
-			callback(dashboardJson);
-	    });
-	});
-
+	}).then(response => {
+		if (!response.ok)
+			return Promise.reject("Request failed "  + response.status + ": " + response.statusText);
+		return response.json();
+	}).then(dashboardJson => {
+		// when dashboard is composed call the callback function and pass the dashboard
+		otpwd = token; // fendo REST servlet is not accessible with standard otp, instead we need to use the token
+		otp_uri_ext = "user=" + otusr + "&pw=" + otpwd; 
+		console.log("Dashboard", dashboardJson);
+		const fendoFilters = ["db", "tags", "properties", "id", "idexcluded"];
+		const promises = [];
+		dashboardJson.rows.forEach(row => {
+			row.panels.forEach(panel => {
+				panel.targets.forEach(target => {
+					if (target.type === "fendodb" && target.hasOwnProperty("db") && target.hasOwnProperty("timeseries")) {
+						target.target = target.db + ":" + target.timeseries;
+						target.series = target.target;
+						target.column = "value";
+						delete target.type;
+						delete target.db;
+						delete target.timeseries;
+					}
+					else if (target.type === "fendodb" && target.hasOwnProperty("filter")) {
+						const filter = target.filter;
+						if (!filter.hasOwnProperty("db")) {
+							console.error("Filter is lacking property 'db': ", filter);
+							return;
+						}
+						const db = filter.db;
+						const searchParams = new URLSearchParams;
+						searchParams.set("target", "find");
+						searchParams.set("pw", otpwd);
+						console.log("  FILTER ", filter); // FIXME
+						console.log("   Admissible filter keys ", Object.keys(filter).filter(key => key in fendoFilters));
+						console.log("   (master keys : ", fendoFilters, ")")
+						
+						Object.keys(filter)
+							.filter(key => fendoFilters.indexOf(key) >= 0)
+							.forEach(key => searchParams.append(key, filter[key]));
+						console.log("  search params ", searchParams.toString());  //FIXME
+						const promise = fetch("/rest/fendodb?" + searchParams.toString(), {
+							 	method: "GET",
+						        credentials: "omit",
+						        headers: {
+						        	Accept: "text/plain"
+						        }
+							}).then(response => {
+								if (!response.ok)
+									throw Error("Request failed: ", response.status, ":", response.statusText);
+								return response.text();
+							}).then(list => {
+								list.split(/\r?\n/)
+									.map(str => str.trim())
+									.filter(str => str.length > 0)
+									.forEach(str => {
+										const newTarget = {};
+										newTarget.target = db + ":" + str;
+										newTarget.series = newTarget.target;
+										newTarget.column = "value";
+										panel.targets.push(newTarget);
+									});
+								delete target; // FIXME during iteration... this is dangerous! better delete this afterwards!
+							});
+						promises.push(promise);
+					}
+				});
+			});
+		});
+		return Promise.all(promises).then(() => dashboardJson);
+    })
+    .then(callback)
+    .catch(err => console.error("Failed to load dashboard",err));
 }
