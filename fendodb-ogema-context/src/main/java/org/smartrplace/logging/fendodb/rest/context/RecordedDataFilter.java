@@ -20,7 +20,6 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.security.AccessControlContext;
-
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
@@ -30,9 +29,6 @@ import org.ogema.accesscontrol.RestAccess;
 import org.osgi.service.component.ComponentServiceObjects;
 import org.osgi.service.component.annotations.Component;
 import org.osgi.service.component.annotations.Reference;
-import org.osgi.service.component.annotations.ReferenceCardinality;
-import org.osgi.service.component.annotations.ReferencePolicy;
-import org.osgi.service.component.annotations.ReferencePolicyOption;
 import org.osgi.service.http.context.ServletContextHelper;
 import org.osgi.service.http.whiteboard.HttpWhiteboardConstants;
 import org.smartrplace.logging.fendodb.accesscontrol.FendoDbAccessControl;
@@ -157,7 +153,7 @@ public class RecordedDataFilter extends ServletContextHelper {
 		final FendoDbPermission perm = new FendoDbPermission("perm", database.toString().replace('\\', '/'), action);
 		try {
 			ctx.checkPermission(perm);
-		} catch (SecurityException e) {
+		} catch (SecurityException e) {	
 			return false;
 		}
 		return true;

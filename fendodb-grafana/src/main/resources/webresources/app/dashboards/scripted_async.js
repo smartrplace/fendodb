@@ -79,14 +79,11 @@ return function(callback) {
 						const searchParams = new URLSearchParams;
 						searchParams.set("target", "find");
 						searchParams.set("pw", otpwd);
-						console.log("  FILTER ", filter); // FIXME
-						console.log("   Admissible filter keys ", Object.keys(filter).filter(key => key in fendoFilters));
-						console.log("   (master keys : ", fendoFilters, ")")
 						
 						Object.keys(filter)
 							.filter(key => fendoFilters.indexOf(key) >= 0)
-							.forEach(key => searchParams.append(key, filter[key]));
-						console.log("  search params ", searchParams.toString());  //FIXME
+							.forEach(key => Array.isArray(filter[key]) ? filter[key].forEach(v => searchParams.append(key,v)) 
+									: searchParams.append(key, filter[key]));
 						const promise = fetch("/rest/fendodb?" + searchParams.toString(), {
 							 	method: "GET",
 						        credentials: "omit",
@@ -108,7 +105,7 @@ return function(callback) {
 										newTarget.column = "value";
 										panel.targets.push(newTarget);
 									});
-								delete target; // FIXME during iteration... this is dangerous! better delete this afterwards!
+								delete target; // FIXME during iteration... better delete this afterwards!
 							});
 						promises.push(promise);
 					}

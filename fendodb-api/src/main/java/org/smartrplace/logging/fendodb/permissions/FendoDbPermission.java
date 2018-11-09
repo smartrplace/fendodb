@@ -99,39 +99,11 @@ public class FendoDbPermission extends Permission {
 	}
 
 	private static boolean equals(final Path path, final Path potentialMatch) {
-		if (path.equals(potentialMatch))
-			return true;
-		if (path.isAbsolute() && potentialMatch.isAbsolute())
-			return false;
-		return AccessController.doPrivileged(new PrivilegedAction<Boolean>() {
-
-			@Override
-			public Boolean run() {
-				try {
-					return path.toAbsolutePath().equals(potentialMatch.toAbsolutePath());	
-				} catch (IOError | SecurityException e) {
-					return false;
-				}
-			}
-		});
+		return path.equals(potentialMatch);
  	}
 	
 	private static boolean startsWith(final Path path, final Path potentialParent) {
-		if (path.startsWith(potentialParent))
-			return true;
-		if (path.isAbsolute() && potentialParent.isAbsolute())
-			return false;
-		return AccessController.doPrivileged(new PrivilegedAction<Boolean>() {
-
-			@Override
-			public Boolean run() {
-				try {
-					return path.toAbsolutePath().startsWith(potentialParent.toAbsolutePath());	
-				} catch (IOError | SecurityException e) {
-					return false;
-				}
-			}
-		});
+		return path.startsWith(potentialParent);
 	}
 	
 	@Override
