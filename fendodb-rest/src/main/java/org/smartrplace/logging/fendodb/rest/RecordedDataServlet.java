@@ -18,6 +18,7 @@ package org.smartrplace.logging.fendodb.rest;
 
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.io.UnsupportedEncodingException;
 import java.io.Writer;
 import java.net.URLDecoder;
 import java.nio.file.Paths;
@@ -369,13 +370,9 @@ public class RecordedDataServlet extends HttpServlet {
     	if (format == FendodbSerializationFormat.JSON) { // special case: requesting data in influx format
     		final String q = req.getParameter("q");
     		if (q != null && q.toLowerCase().startsWith("select") && "/series".equalsIgnoreCase(req.getPathInfo())) {
-				final String subStr1 = q.substring(q.indexOf("from") + 6);
-				final String name = subStr1.substring(0, subStr1.indexOf('\"'));
-				final int colon = name.indexOf(':');
-				final String db = name.substring(0, colon);
-				String path = name.substring(colon+1);
-				if (path.contains("%2F"))
-					path = URLDecoder.decode(path, "UTF-8");
+    			final String[] dbPath = extractDbAndPath(q);
+    			final String db = dbPath[0];
+    			final String path = dbPath[1];
     	    	try (final CloseableDataRecorder recorder = factory.getExistingInstance(Paths.get(db))) {
     	    		if (recorder == null) {
     		    		resp.sendError(HttpServletResponse.SC_NOT_FOUND, "Database not found: " + db);
@@ -386,7 +383,7 @@ public class RecordedDataServlet extends HttpServlet {
     		    		resp.sendError(HttpServletResponse.SC_NOT_FOUND, "Timeseries not found: " + path);
     		    		return;
     	    		}
-    	    		serializeToInfluxJson(ts, resp.getWriter(), q, req);
+    	    		serializeToInfluxJson(ts, resp.getWriter(), db, q, req);
     	    	}
 	    		return;
     		}
@@ -920,11 +917,76 @@ public class RecordedDataServlet extends HttpServlet {
     	return multiplier * duration;
     }
     
+    /*
+     * Default values : [db, timeseries path]
+     */
+    private static String[] extractLabel(final String query, final String[] defaultVal, final FendoTimeSeries timeSeries) {
+    	final int idx = query.indexOf(" from \"");
+    	if (idx < 0)
+    		return defaultVal;
+    	final String sub = query.substring("select ".length(), idx);
+    	final int lastOpen = sub.lastIndexOf('(');
+    	if (idx < 0)
+    		return defaultVal;
+    	final String lab = sub.substring(0, lastOpen).trim();
+    	if ("undefined".equalsIgnoreCase(lab)) 
+    		return defaultVal;
+    	else if (lab.indexOf('|') < 0)
+    		return new String[] {lab, defaultVal[1]};
+    	final String[] split = lab.split("\\|");
+    	return new String[] {split[0], replacePropertyPatterns(split[1], defaultVal[0], defaultVal[1], timeSeries)};
+    }
+    
+    private static String replacePropertyPatterns(final String lab2, final String db, final String path, final FendoTimeSeries timeSeries) {
+    	int start = 0;
+    	final StringBuilder sb = new StringBuilder();
+    	while (start < lab2.length()) {
+    		final int nextStart = lab2.indexOf("{$", start);
+    		if (nextStart < 0)
+    			break;
+    		final int nextEnd = lab2.indexOf('}', nextStart);
+    		if (nextEnd < 0)
+    			break;
+    		if (nextStart > start) {
+    			sb.append(lab2.substring(start, nextStart)); 
+    		}
+    		final String pattern = lab2.substring(nextStart + 2, nextEnd);
+    		final List<String> props = 
+    				pattern.equalsIgnoreCase("fendodb") ? Collections.singletonList(db) :
+    				pattern.equalsIgnoreCase("timeseries") ? Collections.singletonList(path) :
+    				timeSeries.getProperties(pattern);
+    		if (props.isEmpty()) {
+    			// FIXME
+    			sb.append(lab2.substring(nextStart, nextEnd+1));
+    		} else if (props.size() == 1) {
+    			sb.append(props.get(0));
+    		} else {
+    			sb.append(props.stream().collect(Collectors.joining(", ")));
+    		}
+    		start = nextEnd + 1;
+    	}
+    	if (start < lab2.length())
+    		sb.append(lab2.substring(start));
+    	return sb.toString();
+    }
+    
+    private static String[] extractDbAndPath(final String query) throws UnsupportedEncodingException {
+		final String subStr1 = query.substring(query.indexOf("from") + 6);
+		final String name = subStr1.substring(0, subStr1.indexOf('\"'));
+		final int colon = name.indexOf(':');
+		final String db = name.substring(0, colon);
+		String path = name.substring(colon+1);
+		if (path.contains("%2F"))
+			path = URLDecoder.decode(path, "UTF-8");
+		return new String[] {db, path};
+    }
+    
     private void serializeToInfluxJson(final FendoTimeSeries timeSeries, final PrintWriter writer, 
-    		final String query, final HttpServletRequest req) throws IOException {
+    		final String db, final String query, final HttpServletRequest req) throws IOException {
     	final long start = getTime(query, query.indexOf(" time > "), true) * 1000;
     	final long end = getTime(query, query.indexOf(" time < "), false) * 1000;
-    	serializeToInfluxJson(timeSeries.iterator(start, end), writer, timeSeries.getPath(), getIndentFactor(req), getMaxNrValues(req));
+    	serializeToInfluxJson(timeSeries.iterator(start, end), writer, extractLabel(query, new String[] {db, timeSeries.getPath()}, timeSeries), 
+    			getIndentFactor(req), getMaxNrValues(req));
     }
     
     private final long now() {
@@ -942,6 +1004,7 @@ public class RecordedDataServlet extends HttpServlet {
     /*
      * Output:
      * [{
+     	  "name": "Primary label",
 		  "columns": ["time", "myTestThermostat/temperatureSensor/deviceFeedback/setpoint"],
 		  "points": [
 			  [1540938247494, 21, 294.1499938964844],
@@ -952,8 +1015,8 @@ public class RecordedDataServlet extends HttpServlet {
 		  ]
 	  }]
      */
-    private static void serializeToInfluxJson(final Iterator<SampledValue> values, final PrintWriter writer, final String label, 
-    		final int indentFactor, int maxNrValues) throws IOException {
+    private static void serializeToInfluxJson(final Iterator<SampledValue> values, final PrintWriter writer, 
+    		final String[] labels, final int indentFactor, final int maxNrValues) throws IOException {
     	final boolean doIndent = indentFactor > 0;
     	final String indent;
     	if (!doIndent)
@@ -966,8 +1029,13 @@ public class RecordedDataServlet extends HttpServlet {
     		writer.write('\n');
     		writer.write(indent);
     	}
+    	writer.write("\"name\":\"" + labels[0] + "\",");
+    	if (doIndent) {
+    		writer.write('\n');
+    		writer.write(indent);
+    	}
     	writer.write("\"columns\": [\"time\", \"");
-    		writer.write(label);
+    		writer.write(labels[1]);
     		writer.write('\"');
     		writer.write(']');
     		writer.write(',');

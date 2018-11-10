@@ -103,6 +103,9 @@ return function(callback) {
 										newTarget.target = db + ":" + str;
 										newTarget.series = newTarget.target;
 										newTarget.column = "value";
+										newTarget.function = target.hasOwnProperty("name") ? target.name : db;
+										if (target.hasOwnProperty("labelpattern")) 
+											newTarget.function = newTarget.function + "|" + target.labelpattern;
 										panel.targets.push(newTarget);
 									});
 								delete target; // FIXME during iteration... better delete this afterwards!
@@ -115,5 +118,5 @@ return function(callback) {
 		return Promise.all(promises).then(() => dashboardJson);
     })
     .then(callback)
-    .catch(err => console.error("Failed to load dashboard",err));
+    .catch(err => console.error("Failed to load dashboard",err)); // TODO display error
 }
