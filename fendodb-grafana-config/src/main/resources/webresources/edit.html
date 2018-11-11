@@ -14,7 +14,7 @@
 	<br>
 	<span id="alert" style="display:none; width:100vw; background-color:lightblue;"></span>
 	<br>
-	<div style="display: flex; column-gap: 1em;">
+	<div style="display: none; column-gap: 1em;" id="saveDiv">
 		  <span style="margin-right:1em;">Save changes</span><input type="button" value="Save" onclick="save();">
 	</div> 
     <script>
@@ -66,10 +66,14 @@
     		   		credentials:"same-origin",
     		   		method: "get"
     		   }).then(response => {
-    		   		if (!response.ok)
+    		   		if (!response.ok) {
 					    throw Error(response.statusText); // TODO show alert instead
-					else					
+					}
+					else {
+						if (response.headers.get("X-Editable") === "true")
+							document.getElementById("saveDiv").style.display = "flex";
 						return response.json();
+					}
     		   }).then(update);
 		 }
     </script>

@@ -1,11 +1,17 @@
 package org.smartrplace.logging.fendodb.grafana;
 
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.io.PrintWriter;
 import java.lang.ref.WeakReference;
+import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
+import java.util.Enumeration;
 import java.util.Iterator;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -18,6 +24,7 @@ import javax.servlet.http.HttpServletResponse;
 
 import org.ogema.core.application.Application;
 import org.ogema.core.application.ApplicationManager;
+import org.osgi.framework.Bundle;
 import org.osgi.framework.BundleContext;
 import org.osgi.service.component.annotations.Activate;
 import org.osgi.service.component.annotations.Component;
@@ -35,13 +42,15 @@ public class FendodbGrafanaApp extends HttpServlet implements Application {
 	private Path userConfigs;
 	private volatile WeakReference<List<String>> globalConfigsList = new WeakReference<>(null);
 	private Path baseFolder;
+	private Bundle thisBundle;
 	
 	@Activate
 	protected void activate(BundleContext ctx) throws IOException {
 		this.baseFolder = ctx.getDataFile(FendodbGrafanaApp.FOLDER).toPath().resolve(FendodbGrafanaApp.GLOBAL_CONFIGS);
 		Files.createDirectories(baseFolder);
+		thisBundle = ctx.getBundle();
 	}
-	
+
 	@Override
 	public void start(ApplicationManager appManager) {
 		this.appMan = appManager;
@@ -79,16 +88,31 @@ public class FendodbGrafanaApp extends HttpServlet implements Application {
 				return;
 			}
 			final Path file = globalConfigs.resolve(config + ".json");
-			if (!Files.isRegularFile(file)) {
-				resp.sendError(HttpServletResponse.SC_NOT_FOUND, "Config " + config + " does not exist");
-				return;
-			}
-			Files.copy(file, resp.getOutputStream());
 			resp.setCharacterEncoding("UTF-8");
 			resp.setContentType("application/json");
+			if (!Files.isRegularFile(file)) {
+				final URL url = getFragmentConfig(config);
+				if (url == null) {
+					resp.sendError(HttpServletResponse.SC_NOT_FOUND, "Config " + config + " does not exist");
+					return;
+				}
+				final byte[] buffer = new byte[8192];
+			    int bytesRead;
+			    try (final InputStream in = url.openStream(); 
+			    		final OutputStream out = resp.getOutputStream()) {
+				    while ((bytesRead = in.read(buffer)) != -1) {
+				        out.write(buffer, 0, bytesRead);
+				    }
+			    }
+			    resp.setHeader("X-Editable", "false");
+			} else { 
+				Files.copy(file, resp.getOutputStream());
+				resp.setHeader("X-Editable", "true");
+			}
 			break;
 		case "configs":
-			final List<String> configs = getGlobalConfigs();
+			final List<String> configs = new ArrayList<>(getGlobalConfigs());
+			configs.addAll(getFragmentConfigs());
 			print(resp.getWriter(), configs);
 			resp.setContentType("application/json");
 			break;
@@ -134,6 +158,24 @@ public class FendodbGrafanaApp extends HttpServlet implements Application {
 					globalConfigsList = new WeakReference<List<String>>(list);
 				}
 			}
+		}
+		return list;
+	}
+	
+	private URL getFragmentConfig(final String config) {
+		final Enumeration<URL> en = thisBundle.findEntries("configs", config + ".json" , false);
+		return en.hasMoreElements() ? en.nextElement() : null;
+	}
+	
+	private List<String> getFragmentConfigs() {
+		final Enumeration<URL> urls = thisBundle.findEntries("/configs", "*.json", true);
+		if (urls == null || !urls.hasMoreElements())
+			return Collections.emptyList();
+		final List<String> list = new ArrayList<>();
+		while (urls.hasMoreElements()) {
+			final URL url = urls.nextElement();
+			final String path = url.getPath();
+			list.add(path.substring("/configs/".length(), path.length() - ".json".length()));
 		}
 		return list;
 	}

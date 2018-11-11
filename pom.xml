@@ -60,6 +60,7 @@
 		<module>fendodb-core</module>
 		<module>fendodb-grafana</module>
 		<module>fendodb-grafana-config</module>
+		<module>fendodb-grafana-ogema-configs</module>
 		<module>fendodb-influx-connector</module>
 		<module>fendodb-ogema-context</module>
 		<module>fendodb-ogema-tagging</module>

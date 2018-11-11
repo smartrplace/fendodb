@@ -955,7 +955,7 @@ public class RecordedDataServlet extends HttpServlet {
     				pattern.equalsIgnoreCase("fendodb") ? Collections.singletonList(db) :
     				pattern.equalsIgnoreCase("timeseries") ? Collections.singletonList(path) :
     				timeSeries.getProperties(pattern);
-    		if (props.isEmpty()) {
+    		if (props == null || props.isEmpty()) {
     			// FIXME
     			sb.append(lab2.substring(nextStart, nextEnd+1));
     		} else if (props.size() == 1) {

@@ -19,6 +19,7 @@
 // accessible variables in this scope
 //var window, document, ARGS, $, jQuery, moment, kbn;
 
+// TODO support multiple label patterns, depending on which tags are present! 
 return function(callback) {
 	const search = new URLSearchParams(window.location.search);
 	if (!search.has("config")) {
