@@ -131,7 +131,7 @@ public class SearchFilterBuilder {
 	}
 	
 	/**
-	 * Find time series for which at least one of the specified properties match
+	 * Find time series for which each of the specified properties match
 	 * @param properties
 	 * @param valueIgnoreCase
 	 * @return
@@ -142,14 +142,14 @@ public class SearchFilterBuilder {
 			return this;
 		if (properties.size() == 1)
 			return filterByProperty(properties.keySet().iterator().next(), properties.values().iterator().next(), valueIgnoreCase);
-		final Or newMatcher = new Or(properties.entrySet().stream()
+		final And newMatcher = new And(properties.entrySet().stream()
 				.map(entry -> new PropertyMatcher(entry.getKey(), entry.getValue(), valueIgnoreCase)).collect(Collectors.toList()));
 		setOrAnd(newMatcher);
 		return this;
 	}
 	
 	/**
-	 * Find time series for which at least one of the specified properties match
+	 * Find time series for which each of the specified properties match
 	 * @param properties
 	 * @param valueIgnoreCase
 	 * @return
@@ -160,7 +160,7 @@ public class SearchFilterBuilder {
 			return this;
 		if (properties.size() == 1)
 			return filterByPropertyMultiValue(properties.keySet().iterator().next(), properties.values().iterator().next(), valueIgnoreCase);
-		final Or newMatcher = new Or(properties.entrySet().stream()
+		final And newMatcher = new And(properties.entrySet().stream()
 				.map(entry -> new PropertiesMatcher(entry.getKey(), entry.getValue(), valueIgnoreCase)).collect(Collectors.toList()));
 		setOrAnd(newMatcher);
 		return this;

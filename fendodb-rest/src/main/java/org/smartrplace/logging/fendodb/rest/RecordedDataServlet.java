@@ -32,6 +32,7 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -920,21 +921,92 @@ public class RecordedDataServlet extends HttpServlet {
     /*
      * Default values : [db, timeseries path]
      */
-    private static String[] extractLabel(final String query, final String[] defaultVal, final FendoTimeSeries timeSeries) {
+    private static String[] extractLabel(final String query, final String db, final FendoTimeSeries timeSeries) {
+    	final String path = timeSeries.getPath();
     	final int idx = query.indexOf(" from \"");
     	if (idx < 0)
-    		return defaultVal;
+    		return new String[] {db, path};
     	final String sub = query.substring("select ".length(), idx);
-    	final int lastOpen = sub.lastIndexOf('(');
-    	if (idx < 0)
-    		return defaultVal;
+    	final int lastOpen = sub.lastIndexOf('('); // "(value)"
+    	if (lastOpen < 0)
+    		return new String[] {db, path};
     	final String lab = sub.substring(0, lastOpen).trim();
     	if ("undefined".equalsIgnoreCase(lab)) 
+    		return new String[] {db, path};
+    	final int splitIdx = lab.indexOf("||");
+    	final String primaryLabelPattern = splitIdx >= 0 ? lab.substring(0, splitIdx) : lab;
+    	final String secondaryLabelPattern = splitIdx >= 0 ? lab.substring(splitIdx + 2) : null;
+    	final String primary = getBestMatchingPattern(primaryLabelPattern, db, db, path, timeSeries);
+    	final String secondary = getBestMatchingPattern(secondaryLabelPattern, path, db, path, timeSeries);
+    	return new String[] {primary, secondary};
+    }
+    
+    private static Float[] extractFactorAndOffset(final String query) {
+    	final int idx = query.indexOf(" from \"");
+    	if (idx < 0)
+    		return null;
+    	String sub = query.substring("select ".length(), idx);
+    	final int lastOpen = sub.lastIndexOf('('); // "(value*2-2.3)"
+    	final int lastClosed = sub.lastIndexOf(')');
+    	if (lastOpen < 0 || lastClosed < lastOpen)
+    		return null;
+    	sub = sub.substring(lastOpen+1, lastClosed);
+    	if (sub.length() <= "value".length()) // the default case
+    		return null;
+    	final int idxTimes = sub.indexOf('*');
+    	final Float factor;
+    	final Float offset;
+    	int cnt = idxTimes + 1;
+    	if (idxTimes < 0) {
+    		factor = null;
+    		cnt = "value".length();
+    	}
+    	else {
+    		final StringBuilder sb = new StringBuilder();
+    		final int first = cnt;
+    		for (char c : sub.substring(cnt).toCharArray()) {
+    			if (Character.isDigit(c) || c == '.' || (cnt == first && (c == '+' || c== '-')))
+    				sb.append(c);
+    			else
+    				break;
+    			cnt++;
+    		}
+    		factor = Float.parseFloat(sb.toString());
+    	}
+    	if (cnt < sub.length()) {
+    		final StringBuilder sb = new StringBuilder();
+    		final int first = cnt;
+    		for (char c : sub.substring(cnt).toCharArray()) {
+    			if (Character.isDigit(c) || c == '.' || (cnt == first && (c == '+' || c== '-')))
+    				sb.append(c);
+    			else
+    				break;
+    			cnt++;
+    		}
+    		offset = Float.parseFloat(sb.toString());
+    	} else {
+    		offset = null;
+    	}
+    	return new Float[] {factor, offset};
+    }
+    
+    /**
+     * @param patterns
+     * 		a set of patterns, joined into a single string and separated by '|'; may be null
+     * @param defaultVal
+     * 		the value to be applied if none of the patterns match, or if patterns is null
+     * @param timeSeries
+     * @return
+     */
+    private static String getBestMatchingPattern(final String patterns, final String defaultVal, 
+    		final String db, final String path, final FendoTimeSeries timeSeries) {
+    	if (patterns == null)
     		return defaultVal;
-    	else if (lab.indexOf('|') < 0)
-    		return new String[] {lab, defaultVal[1]};
-    	final String[] split = lab.split("\\|");
-    	return new String[] {split[0], replacePropertyPatterns(split[1], defaultVal[0], defaultVal[1], timeSeries)};
+    	return Arrays.stream(patterns.split("\\|"))
+    		.map(pattern -> replacePropertyPatterns(pattern, db, path, timeSeries))
+    		.filter(Objects::nonNull)
+    		.findFirst()
+    		.orElse(defaultVal);
     }
     
     private static String replacePropertyPatterns(final String lab2, final String db, final String path, final FendoTimeSeries timeSeries) {
@@ -956,8 +1028,7 @@ public class RecordedDataServlet extends HttpServlet {
     				pattern.equalsIgnoreCase("timeseries") ? Collections.singletonList(path) :
     				timeSeries.getProperties(pattern);
     		if (props == null || props.isEmpty()) {
-    			// FIXME
-    			sb.append(lab2.substring(nextStart, nextEnd+1));
+    			return null;
     		} else if (props.size() == 1) {
     			sb.append(props.get(0));
     		} else {
@@ -985,8 +1056,8 @@ public class RecordedDataServlet extends HttpServlet {
     		final String db, final String query, final HttpServletRequest req) throws IOException {
     	final long start = getTime(query, query.indexOf(" time > "), true) * 1000;
     	final long end = getTime(query, query.indexOf(" time < "), false) * 1000;
-    	serializeToInfluxJson(timeSeries.iterator(start, end), writer, extractLabel(query, new String[] {db, timeSeries.getPath()}, timeSeries), 
-    			getIndentFactor(req), getMaxNrValues(req));
+    	serializeToInfluxJson(timeSeries.iterator(start, end), writer, extractLabel(query, db, timeSeries), 
+    			getIndentFactor(req), getMaxNrValues(req), extractFactorAndOffset(query));
     }
     
     private final long now() {
@@ -1005,7 +1076,7 @@ public class RecordedDataServlet extends HttpServlet {
      * Output:
      * [{
      	  "name": "Primary label",
-		  "columns": ["time", "myTestThermostat/temperatureSensor/deviceFeedback/setpoint"],
+		  "columns": ["time", "Secondary label"],
 		  "points": [
 			  [1540938247494, 21, 294.1499938964844],
 			  [1540938267977, 21, 294.1499938964844],
@@ -1016,7 +1087,7 @@ public class RecordedDataServlet extends HttpServlet {
 	  }]
      */
     private static void serializeToInfluxJson(final Iterator<SampledValue> values, final PrintWriter writer, 
-    		final String[] labels, final int indentFactor, final int maxNrValues) throws IOException {
+    		final String[] labels, final int indentFactor, final int maxNrValues, final Float[] factorOffset) throws IOException {
     	final boolean doIndent = indentFactor > 0;
     	final String indent;
     	if (!doIndent)
@@ -1056,7 +1127,7 @@ public class RecordedDataServlet extends HttpServlet {
     		writer.write(String.valueOf(sv.getTimestamp()));
     		writer.write(',');
     		writer.write(' ');
-    		writer.write(String.valueOf(sv.getValue().getFloatValue()));
+    		writer.write(String.valueOf(factorOffset == null ? sv.getValue().getFloatValue() : getValue(sv.getValue().getFloatValue(), factorOffset)));
     		writer.write(']');
     		if (values.hasNext())
     			writer.write(',');
@@ -1070,6 +1141,14 @@ public class RecordedDataServlet extends HttpServlet {
     		writer.write('\n');
     	writer.write('}');
     	writer.write(']');
+    }
+    
+    private static final float getValue(float v1, final Float[] factorOffset) {
+    	if (factorOffset[0] != null)
+    		v1 = v1 * factorOffset[0];
+    	if (factorOffset[1] != null)
+    		v1 = v1 + factorOffset[1];
+    	return v1;
     }
 
     private static int getIndentFactor(final HttpServletRequest req) {

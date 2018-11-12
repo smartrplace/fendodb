@@ -34,8 +34,8 @@
           "targets": [
 			{
 			  "type":"fendodb",
-			  "name":"Power",
-			  "labelpattern":"{$roomName} ({$deviceName})",
+			  "labelprimary":"Power",
+			  "labelsecondary":"{$roomName} ({$deviceName})|{$roomName}|{$timeseries}",
 			  "filter": {
 				"db": "data/slotsdb",
 				"properties": ["dataType=measurement","deviceTypeSpecific=PowerSensor"]

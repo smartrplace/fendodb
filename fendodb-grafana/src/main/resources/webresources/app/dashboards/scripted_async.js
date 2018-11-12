@@ -104,9 +104,16 @@ return function(callback) {
 										newTarget.target = db + ":" + str;
 										newTarget.series = newTarget.target;
 										newTarget.column = "value";
-										newTarget.function = target.hasOwnProperty("name") ? target.name : db;
-										if (target.hasOwnProperty("labelpattern")) 
-											newTarget.function = newTarget.function + "|" + target.labelpattern;
+										if (target.hasOwnProperty("factor"))
+											newTarget.column = newTarget.column + "*" + target.factor;
+										if (target.hasOwnProperty("offset")) {
+											if (target.offset >= 0)
+												newTarget.column = newTarget.column + "+";
+											newTarget.column = newTarget.column + target.offset;
+										}
+										newTarget.function = target.hasOwnProperty("labelprimary") ? target.labelprimary : db;
+										if (target.hasOwnProperty("labelsecondary")) 
+											newTarget.function = newTarget.function + "||" + target.labelsecondary;
 										panel.targets.push(newTarget);
 									});
 								delete target; // FIXME during iteration... better delete this afterwards!

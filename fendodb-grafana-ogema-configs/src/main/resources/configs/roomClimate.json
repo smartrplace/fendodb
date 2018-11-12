@@ -34,13 +34,14 @@
           "targets": [
 			{
 			  "type":"fendodb",
-			  "name":"Temperature",
-			  "labelpattern":"{$roomName} ({$deviceName})",
+			  "labelprimary":"Temperature",
+			  "labelsecondary":"{$roomName} ({$deviceName})|{$roomName} ({$timeseries})|{$timeseries}",
 			  "filter": {
 				"db": "data/slotsdb",
-				"properties": ["dataType=measurement","deviceTypeSpecific=TemperatureSensor"],
-				"tags": ["roomName", "deviceName"]
-			  }
+				"properties": ["dataType=measurement","deviceTypeSpecific=TemperatureSensor"]
+			  },
+  			  "offset":-273.15,
+  			  "factor":1
             }
           ],
           "steppedLine": true,
@@ -105,15 +106,14 @@
             "targets": [
   			{
   			  "type":"fendodb",
-  			  "name":"Humidity",
-  			  "labelpattern":"{$roomName} ({$deviceName})",
+  			  "labelprimary":"Humidity",
+  			  "labelsecondary":"{$roomName} ({$deviceName})|{$roomName} ({$timeseries})|{$timeseries}",
   			  "filter": {
   				"db": "data/slotsdb",
-  				"properties": ["dataType=measurement","deviceTypeSpecific=HumiditySensor"],
-				"tags": ["roomName", "deviceName"]
-  			  }
-              }
-            ],
+  				"properties": ["dataType=measurement","deviceTypeSpecific=HumiditySensor"]
+  			  },
+  			  "factor":100
+            }],
             "steppedLine": true,
             "datasource": "influxdb",
             "tooltip": {
