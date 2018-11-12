@@ -50,7 +50,7 @@ public class ContextTest {
 	
 	private static final String SLF4J_VERSION = "1.7.25";
 	private static final String FENDO_VERSION = "0.0.4-SNAPSHOT";
-	private static final String OGEMA_VERSION = "2.1.4-SNAPSHOT"; // FIXME
+	private static final String OGEMA_VERSION = "2.2.0"; // FIXME
 	private static final Path osgiStorage = Paths.get("data/osgi-storage");
 	private static final int HTTP_PORT = 4321;
 	private static final String BASE_URL = "http://localhost:" + HTTP_PORT + "/rest/fendodb";
@@ -86,7 +86,7 @@ public class ContextTest {
 				// these four options are required with the forked launcher; otherwise they are in the surefire plugin
 				CoreOptions.vmOption("-Djava.security.policy=config/all.policy"),
 				CoreOptions.vmOption("-Dorg.ogema.security=on"),
-				CoreOptions.when(getJavaVersion() >= 9).useOptions(
+				CoreOptions.when(getJavaVersion() >= 9).useOptions( // TODO java 11 config
 					CoreOptions.vmOption("--add-opens=java.base/jdk.internal.loader=ALL-UNNAMED"),
 					CoreOptions.vmOption("--add-modules=java.xml.bind,java.xml.ws.annotation")
 				),
@@ -115,6 +115,7 @@ public class ContextTest {
 				CoreOptions.mavenBundle("org.smartrplace.logging", "fendodb-tools", FENDO_VERSION),
 				CoreOptions.mavenBundle("org.smartrplace.logging", "fendodb-rest", FENDO_VERSION),
 				CoreOptions.mavenBundle("org.smartrplace.logging", "fendodb-ogema-context", FENDO_VERSION),
+				CoreOptions.mavenBundle("org.smartrplace.tools", "smartrplace-servlet-context", "0.0.1-SNAPSHOT"), // FIXME version
 				
 				// Jackson
 				CoreOptions.mavenBundle("com.fasterxml.jackson.core", "jackson-core", "2.9.6"),

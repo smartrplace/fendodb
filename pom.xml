@@ -261,6 +261,11 @@
 				<artifactId>models</artifactId>
 				<version>${ogema.api.version}</version>
 			</dependency>
+			<dependency>
+				<groupId>org.ogema.ref-impl</groupId>
+				<artifactId>internal-api</artifactId>
+				<version>${ogema.api.version}</version>
+			</dependency>
 			<!-- OGEMA Tools and Services -->
 			<dependency>
 				<groupId>org.ogema.tools</groupId>

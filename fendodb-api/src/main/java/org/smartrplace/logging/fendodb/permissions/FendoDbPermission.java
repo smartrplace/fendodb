@@ -16,12 +16,9 @@
  */
 package org.smartrplace.logging.fendodb.permissions;
 
-import java.io.IOError;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.security.AccessController;
 import java.security.Permission;
-import java.security.PrivilegedAction;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -60,7 +57,7 @@ public class FendoDbPermission extends Permission {
 		this.pathHasWildcard = path.endsWith("*");
 		if (pathHasWildcard)
 			path = path.substring(0, path.length()-1);
-		this.path = Paths.get(path).normalize();
+		this.path = path.isEmpty() ? null : Paths.get(path).normalize();
 		if (actions.equals(WILDCARD)) {
 			this.actions = ALL_ACTIONS;
 		} else {
@@ -99,10 +96,14 @@ public class FendoDbPermission extends Permission {
 	}
 
 	private static boolean equals(final Path path, final Path potentialMatch) {
-		return path.equals(potentialMatch);
+		return Objects.equals(path, potentialMatch);
  	}
 	
 	private static boolean startsWith(final Path path, final Path potentialParent) {
+		if (potentialParent == null)
+			return true;
+		if (path == null)
+			return false;
 		return path.startsWith(potentialParent);
 	}
 	
@@ -115,7 +116,7 @@ public class FendoDbPermission extends Permission {
 		final FendoDbPermission other = (FendoDbPermission) obj;
 		if (this.pathHasWildcard != other.pathHasWildcard)
 			return false;
-		if (!this.path.equals(other.path))
+		if (!Objects.equals(this.path,other.path))
 			return false;
 		if (this.nrActions != other.nrActions)
 			return false;

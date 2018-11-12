@@ -103,6 +103,8 @@ public class RecordedDataFilter extends ServletContextHelper {
     		token1 = req.getParameter("pw");
     	else 
     		token1 = token.substring("bearer ".length());
+    	if (token1 == null)
+    		return null;
     	final AppAuthentication appAuth = appAuthService.getService();
     	try {
     		return appAuth.getContext(token1.toCharArray());

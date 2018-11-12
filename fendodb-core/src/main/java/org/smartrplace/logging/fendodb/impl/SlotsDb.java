@@ -264,8 +264,8 @@ public class SlotsDb implements CloseableDataRecorder {
 					|| (persistedConfiguration != null && persistedConfiguration.useCompatibilityMode()))) ||
 				(dbEmpty && passedConfiguration != null && passedConfiguration.useCompatibilityMode());
 		final TemporalUnit unit =
-				compatMode || persistedConfiguration == null ? ChronoUnit.DAYS :
-				!dbEmpty ? persistedConfiguration.getFolderCreationTimeUnit() :
+				compatMode ? ChronoUnit.DAYS :
+				persistedConfiguration != null ? persistedConfiguration.getFolderCreationTimeUnit() :
 				passedConfiguration != null ? passedConfiguration.getFolderCreationTimeUnit() :
 				ChronoUnit.DAYS;
 		final boolean parseFolderOnInit = passedConfiguration != null ? passedConfiguration.isReadFolders() :
@@ -295,7 +295,7 @@ public class SlotsDb implements CloseableDataRecorder {
 	}
 
 	@Override
-	public DataRecorderReference updateConfiguration(FendoDbConfiguration newConfiguration) throws IOException {
+	public DataRecorderReference updateConfiguration(final FendoDbConfiguration newConfiguration) throws IOException {
 		if (Objects.requireNonNull(newConfiguration).equals(config))
 			return new FendoDbReference(this, this.secure);
 		if (!requiresHardReset(config, newConfiguration)) {

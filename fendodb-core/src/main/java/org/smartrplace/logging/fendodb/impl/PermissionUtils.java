@@ -32,6 +32,12 @@ class PermissionUtils {
 		checkPermission(path, FendoDbPermission.READ, accessManager);
 	}
 	
+	/**
+	 * @param path
+	 * @param action
+	 * @param accessManager
+	 * @throws SecurityException
+	 */
 	final static void checkPermission(final Path path, final String action, final FendoDbAccessControl accessManager) {
 		final String pathStr = path.toString();
 		final AccessControlContext ctx = accessManager == null ? null : accessManager.getAccessControlContext();
