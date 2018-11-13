@@ -74,7 +74,8 @@
           },
           "nullPointMode": "connected",
           "aliasColors": {},
-          "seriesOverrides": []
+          "seriesOverrides": [],
+          "leftYAxisLabel":"W"
         }
       ],
       "collapse": false

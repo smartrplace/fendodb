@@ -55,6 +55,7 @@ import org.osgi.service.component.annotations.ReferenceCardinality;
 import org.osgi.service.component.annotations.ReferencePolicy;
 import org.osgi.service.component.annotations.ReferencePolicyOption;
 import org.osgi.service.http.whiteboard.HttpWhiteboardConstants;
+import org.slf4j.LoggerFactory;
 import org.smartrplace.logging.fendodb.CloseableDataRecorder;
 import org.smartrplace.logging.fendodb.FendoDbFactory;
 import org.smartrplace.logging.fendodb.FendoTimeSeries;
@@ -1068,7 +1069,11 @@ public class RecordedDataServlet extends HttpServlet {
     	try {
     		return clock.getExecutionTime();
     	} finally {
-    		clockService.ungetService(clock);
+    		try {
+    			clockService.ungetService(clock);
+    		} catch (IllegalArgumentException e) {
+    			LoggerFactory.getLogger(getClass()).warn("Unexpected exception",e);
+    		}
     	}
     }
     

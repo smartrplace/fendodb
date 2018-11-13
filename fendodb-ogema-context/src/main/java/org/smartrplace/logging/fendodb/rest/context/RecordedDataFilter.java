@@ -31,6 +31,7 @@ import org.osgi.service.component.annotations.Component;
 import org.osgi.service.component.annotations.Reference;
 import org.osgi.service.http.context.ServletContextHelper;
 import org.osgi.service.http.whiteboard.HttpWhiteboardConstants;
+import org.slf4j.LoggerFactory;
 import org.smartrplace.logging.fendodb.accesscontrol.FendoDbAccessControl;
 import org.smartrplace.logging.fendodb.permissions.FendoDbPermission;
 import org.smartrplace.logging.fendodb.rest.RecordedDataServlet;
@@ -92,7 +93,11 @@ public class RecordedDataFilter extends ServletContextHelper {
     			return ctx;
     	} catch (NullPointerException expected) { 
     	} finally {
-    		restAccessService.ungetService(ra);
+    		try {
+    			restAccessService.ungetService(ra);
+    		} catch (IllegalArgumentException e) {
+    			LoggerFactory.getLogger(getClass()).warn("Unexpected exception",e);
+    		}
     	}
     	final ComponentServiceObjects<AppAuthentication> appAuthService = this.appAuthService;
     	if (appAuthService == null)
@@ -109,7 +114,11 @@ public class RecordedDataFilter extends ServletContextHelper {
     	try {
     		return appAuth.getContext(token1.toCharArray());
     	} finally {
-    		appAuthService.ungetService(appAuth);
+    		try {
+	    		appAuthService.ungetService(appAuth);
+	    	} catch (IllegalArgumentException e) {
+				LoggerFactory.getLogger(getClass()).warn("Unexpected exception",e);
+	    	}
     	}
     }
     
@@ -122,7 +131,11 @@ public class RecordedDataFilter extends ServletContextHelper {
     		request.setAttribute(REMOTE_USER, user);
     		return true;
     	} finally {
-    		permManService.ungetService(permMan);
+    		try {
+    			permManService.ungetService(permMan);
+    		} catch (IllegalArgumentException e) {
+				LoggerFactory.getLogger(getClass()).warn("Unexpected exception",e);
+	    	}
     	}
     }
 

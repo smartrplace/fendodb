@@ -35,7 +35,7 @@
 			{
 			  "type":"fendodb",
 			  "labelprimary":"Temperature",
-			  "labelsecondary":"{$roomName} ({$deviceName})|{$roomName} ({$timeseries})|{$timeseries}",
+			  "labelsecondary":"{$roomName} ({$deviceName})|{$deviceName}|{$roomName} ({$timeseries})|{$timeseries}",
 			  "filter": {
 				"db": "data/slotsdb",
 				"properties": ["dataType=measurement","deviceTypeSpecific=TemperatureSensor"]
@@ -76,7 +76,8 @@
           },
           "nullPointMode": "connected",
           "aliasColors": {},
-          "seriesOverrides": []
+          "seriesOverrides": [],
+          "leftYAxisLabel":"°C"
         }
       ],
       "collapse": false
@@ -107,7 +108,7 @@
   			{
   			  "type":"fendodb",
   			  "labelprimary":"Humidity",
-  			  "labelsecondary":"{$roomName} ({$deviceName})|{$roomName} ({$timeseries})|{$timeseries}",
+  			  "labelsecondary":"{$roomName} ({$deviceName})|{$deviceName}|{$roomName} ({$timeseries})|{$timeseries}",
   			  "filter": {
   				"db": "data/slotsdb",
   				"properties": ["dataType=measurement","deviceTypeSpecific=HumiditySensor"]
@@ -146,7 +147,8 @@
             },
             "nullPointMode": "connected",
             "aliasColors": {},
-            "seriesOverrides": []
+            "seriesOverrides": [],
+            "leftYAxisLabel":"%"
           }
         ],
         "collapse": false
