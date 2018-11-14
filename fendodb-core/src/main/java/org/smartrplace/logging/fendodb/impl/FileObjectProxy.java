@@ -220,7 +220,7 @@ public final class FileObjectProxy {
 			.collect(Collectors.toList());
 		if (readFolders) {
 			final int newSize = days.size();
-			checkEncodings(Math.max(newSize, newSize-oldSize+1));
+			checkEncodings(Math.min(newSize, newSize-oldSize+1));
 		}
 		return newDays;
 	}
