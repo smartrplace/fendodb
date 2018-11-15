@@ -245,4 +245,23 @@ abstract class InfoTask extends TimerTask {
 		
 	}
 	
+	static class DaysReloading extends InfoTask {
+
+		private final SlotsDb db;
+		
+		DaysReloading(SlotsDb db) {
+			// actually requires a folder lock, but this is obtained in the method Slotsdb#reloadDays.. and MUST NOT be acquired earlier,
+			// otherwise the lock order policy would be violated
+			super(db.proxy, false);
+			this.db = db;
+		}
+		
+		@Override
+		void runInternal() throws IOException {
+			db.reloadDays();
+		}
+		
+	}
+	
+	
 }

@@ -115,6 +115,7 @@ public class SlotsDb implements CloseableDataRecorder {
 	private final DelayedTask tagsPersistence;
 	private final AtomicBoolean closed = new AtomicBoolean(false);
 	final ReferenceCounter proxyCount;
+	private final InfoTask reloadDaysTask;
 
 	final boolean secure;
 	final FrameworkClock clock;
@@ -197,6 +198,11 @@ public class SlotsDb implements CloseableDataRecorder {
 					persistTags();
 				}
 			}, tagsFlush, persistenceScheduler);
+			if (config.getReloadDaysInterval() > 0) {
+				this.reloadDaysTask = new InfoTask.DaysReloading(this);
+				proxy.timer.schedule(reloadDaysTask, FendoDbConfiguration.INITIAL_DELAY, configuration.getReloadDaysInterval());
+			} else
+				this.reloadDaysTask = null;
 			if (factory != null) {
 				factory.triggerListener(this, factory.ownListener, true);
 			}
@@ -270,6 +276,10 @@ public class SlotsDb implements CloseableDataRecorder {
 				ChronoUnit.DAYS;
 		final boolean parseFolderOnInit = passedConfiguration != null ? passedConfiguration.isReadFolders() :
 			persistedConfiguration != null ? persistedConfiguration.isReadFolders() : false;
+		// here it is important to prefer the passed config, since the persitsed config may have been transferred from a different instance
+		final long reloadDaysFolderIntv = passedConfiguration != null ? passedConfiguration.getReloadDaysInterval()
+				: persistedConfiguration != null ? persistedConfiguration.getReloadDaysInterval() 
+				: 0;
 		final FendoDbConfiguration baseConfig = persistedConfiguration != null ? persistedConfiguration : passedConfiguration; // may be null!
 		final FendoDbConfigurationBuilder builder =
 				FendoDbConfigurationBuilder.getInstance(baseConfig); // null arg ok
@@ -277,7 +287,8 @@ public class SlotsDb implements CloseableDataRecorder {
 			.setReadOnlyMode(readOnlyMode)
 			.setUseCompatibilityMode(compatMode)
 			.setTemporalUnit(unit)
-			.setParseFoldersOnInit(parseFolderOnInit);
+			.setParseFoldersOnInit(parseFolderOnInit)
+			.setReloadDaysInterval(reloadDaysFolderIntv);
 		if (readOnlyMode && (persistedConfiguration == null || persistedConfiguration.isReadOnlyMode())) {
 			builder.setFlushPeriod(0)
 				.setDataLifetimeInDays(0)

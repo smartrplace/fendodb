@@ -72,7 +72,7 @@ public final class FileObjectProxy {
 	final ConcurrentMap<String, FileObjectList> openFilesHM;
 	// concurrent map
 //	private final ConcurrentMap<String, String> encodedLabels = new ConcurrentHashMap<>();
-	private final Timer timer;
+	final Timer timer;
 	// synchronized using folderLock
 	List<Path> days;
 	// synchronized using folderLock
@@ -111,7 +111,7 @@ public final class FileObjectProxy {
 		this.readOnlyMode = config.isReadOnlyMode();
 		this.readFolders = config.isReadFolders();
 		this.clock = clock;
-		if (config.getFlushPeriod() > 0 || config.getDataLifetimeInDays() > 0 || config.getMaxDatabaseSize() > 0)
+		if (config.getFlushPeriod() > 0 || config.getDataLifetimeInDays() > 0 || config.getMaxDatabaseSize() > 0 || config.getReloadDaysInterval() > 0)
 			timer = new Timer();
 		else
 			timer = null;

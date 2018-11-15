@@ -34,6 +34,7 @@ public class FendoDbConfiguration implements Serializable {
 	private final int dataLifetimeInDays;
 	private final int maxDatabaseSize;
 	private final long dataExpirationCheckInterval;
+	private final long reloadDaysInterval;
 	private final TemporalUnit unit;
 	private final boolean useCompatibilityMode;
 
@@ -77,7 +78,7 @@ public class FendoDbConfiguration implements Serializable {
 	 */
 	@Deprecated
 	public FendoDbConfiguration(boolean readFolders, int maxOpenFolders, long flushPeriodMs, int dataLifetimeDays, int maxDbSizeMB, long dataExpirationCheckItvMs) {
-		this(false, readFolders, maxOpenFolders, flushPeriodMs, dataLifetimeDays, maxDbSizeMB, dataExpirationCheckItvMs, ChronoUnit.DAYS, false);
+		this(false, readFolders, maxOpenFolders, flushPeriodMs, dataLifetimeDays, maxDbSizeMB, dataExpirationCheckItvMs, 0, ChronoUnit.DAYS, false);
 	}
 
 	FendoDbConfiguration(
@@ -88,6 +89,7 @@ public class FendoDbConfiguration implements Serializable {
 			int dataLifetimeDays, 
 			int maxDbSizeMB, 
 			long dataExpirationCheckItvMs,
+			long reloadDaysInterval,
 			TemporalUnit unit,
 			boolean useCompatibilityMode) {
 		this.readOnlyMode = readOnlyMode;
@@ -106,6 +108,7 @@ public class FendoDbConfiguration implements Serializable {
 			this.dataExpirationCheckInterval = dataExpirationCheckItvMs;
 		this.unit = Objects.requireNonNull(unit);
 		this.useCompatibilityMode = useCompatibilityMode;
+		this.reloadDaysInterval = reloadDaysInterval;
 		if (useCompatibilityMode && !unit.equals(ChronoUnit.DAYS))
 			throw new IllegalArgumentException("Temporal unit " + unit + " cannot be used in compatibility mode; requires DAYS.");
 	}
@@ -141,6 +144,14 @@ public class FendoDbConfiguration implements Serializable {
 	 */
 	public long getDataExpirationCheckInterval() {
 		return dataExpirationCheckInterval;
+	}
+	
+	/**
+	 * In ms
+	 * @return
+	 */
+	public long getReloadDaysInterval() {
+		return reloadDaysInterval;
 	}
 
 	public boolean isReadFolders() {
