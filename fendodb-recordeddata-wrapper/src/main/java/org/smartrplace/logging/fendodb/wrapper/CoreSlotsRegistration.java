@@ -76,6 +76,7 @@ public class CoreSlotsRegistration implements FendoDbFactory.SlotsDbListener, Cl
 				.setDataLifetimeInDays(limitDays)
 				.setMaxDatabaseSize(limitSizeMb)
 				.setDataExpirationCheckInterval(scanningItv)
+				.setReloadDaysInterval(0)
 				.build();
 		final CloseableDataRecorder slots = slotsFactory.getInstance(Paths.get(folder), config);
 		this.sreg = ctx.registerService(DataRecorder.class, slots, null);
