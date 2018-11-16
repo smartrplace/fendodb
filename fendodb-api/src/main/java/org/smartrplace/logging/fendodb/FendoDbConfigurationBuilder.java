@@ -179,7 +179,8 @@ public class FendoDbConfigurationBuilder {
 			.setParseFoldersOnInit(copyConfig.isReadFolders())
 			.setReadOnlyMode(copyConfig.isReadOnlyMode())
 			.setTemporalUnit(copyConfig.getFolderCreationTimeUnit())
-			.setUseCompatibilityMode(copyConfig.useCompatibilityMode());
+			.setUseCompatibilityMode(copyConfig.useCompatibilityMode())
+			.setReloadDaysInterval(copyConfig.getReloadDaysInterval());
 	}
 
 	public FendoDbConfiguration build() {
