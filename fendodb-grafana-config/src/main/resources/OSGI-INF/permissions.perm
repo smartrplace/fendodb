@@ -2,5 +2,6 @@
 (org.osgi.framework.PackagePermission "org.ogema.core.*" "import")
 
 (org.ogema.accesscontrol.WebAccessPermission "name=org.smartrplace.logging.fendodb-grafana")
+(org.osgi.framework.CapabilityPermission "osgi.extender" "require")
 
 
