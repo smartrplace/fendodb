@@ -81,10 +81,34 @@ return function(callback) {
 						searchParams.set("target", "find");
 						searchParams.set("pw", otpwd);
 						
+						const replaceVars = string => {
+							let lastEnd = -1;
+							b = "";
+							while (lastEnd < string.length - 1) {
+								const idx0 = string.indexOf("{$", lastEnd + 1);
+								if (idx0 < 0)
+									break;
+								const idx1 = string.indexOf("}", idx0);
+								if (idx1 < 0)
+									break;
+								const variable = string.substring(idx0+2, idx1);
+								const val = search.getAll(variable);
+								if (val.length === 0) {
+									console.log("Missing page parameter ", variable);
+								} else {
+									b = b + string.substring(lastEnd + 1, idx) + val[0];
+								}
+								lastEnd = idx1;
+							}
+							if (lastEnd < string.length-1)
+								b = b + string.substring(lastEnd + 1);
+							return b;
+						};
+						
 						Object.keys(filter)
 							.filter(key => fendoFilters.indexOf(key) >= 0)
-							.forEach(key => Array.isArray(filter[key]) ? filter[key].forEach(v => searchParams.append(key,v)) 
-									: searchParams.append(key, filter[key]));
+							.forEach(key => Array.isArray(filter[key]) ? filter[key].forEach(v => searchParams.append(key,replaceVars(v))) 
+									: searchParams.append(key, replaceVars(filter[key])));
 						const promise = fetch("/rest/fendodb?" + searchParams.toString(), {
 							 	method: "GET",
 						        credentials: "omit",
