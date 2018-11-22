@@ -76,11 +76,6 @@ return function(callback) {
 							console.error("Filter is lacking property 'db': ", filter);
 							return;
 						}
-						const db = filter.db;
-						const searchParams = new URLSearchParams;
-						searchParams.set("target", "find");
-						searchParams.set("pw", otpwd);
-						
 						const replaceVars = string => {
 							let lastEnd = -1;
 							b = "";
@@ -96,7 +91,7 @@ return function(callback) {
 								if (val.length === 0) {
 									console.log("Missing page parameter ", variable);
 								} else {
-									b = b + string.substring(lastEnd + 1, idx) + val[0];
+									b = b + string.substring(lastEnd + 1, idx0) + val[0];
 								}
 								lastEnd = idx1;
 							}
@@ -104,7 +99,10 @@ return function(callback) {
 								b = b + string.substring(lastEnd + 1);
 							return b;
 						};
-						
+						const db = replaceVars(filter.db);
+						const searchParams = new URLSearchParams;
+						searchParams.set("target", "find");
+						searchParams.set("pw", otpwd);
 						Object.keys(filter)
 							.filter(key => fendoFilters.indexOf(key) >= 0)
 							.forEach(key => Array.isArray(filter[key]) ? filter[key].forEach(v => searchParams.append(key,replaceVars(v))) 
