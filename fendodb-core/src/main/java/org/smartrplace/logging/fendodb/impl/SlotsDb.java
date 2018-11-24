@@ -200,7 +200,7 @@ public class SlotsDb implements CloseableDataRecorder {
 			}, tagsFlush, persistenceScheduler);
 			if (config.getReloadDaysInterval() > 0) {
 				this.reloadDaysTask = new InfoTask.DaysReloading(this);
-				proxy.timer.schedule(reloadDaysTask, FendoDbConfiguration.INITIAL_DELAY, configuration.getReloadDaysInterval());
+				proxy.timer.schedule(reloadDaysTask, FendoDbConfiguration.INITIAL_DELAY, config.getReloadDaysInterval());
 			} else
 				this.reloadDaysTask = null;
 			if (factory != null) {

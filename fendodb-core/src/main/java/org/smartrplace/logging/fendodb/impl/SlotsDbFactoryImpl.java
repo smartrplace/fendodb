@@ -128,6 +128,7 @@ public class SlotsDbFactoryImpl implements FendoDbFactory {
 			"removeProperty",
 			"setProperty",
 			"fendoDbExists",
+			"reloadDays",
 			"updateConfig"
 		});
 		this.exec = Executors.newSingleThreadExecutor();

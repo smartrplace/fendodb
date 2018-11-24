@@ -487,6 +487,18 @@ class GogoCommands {
 			final String path) throws IOException {
 		return ((SlotsDbFactoryImpl) factory).databaseIsActive(Paths.get(path));
 	}
+	
+	@Descriptor("Refresh a database that has been updated by non-API means")
+	public void reloadDays(
+			@Descriptor("Database path, relative to rundir or absolute")
+			final String path) throws IOException {
+		try (final CloseableDataRecorder instance = factory.getExistingInstance(Paths.get(path))) {
+			if (instance == null)
+				System.out.println("Not found");
+			else
+				instance.reloadDays();
+		}
+	}
 
 	private final SlotsDb getImplementation(final CloseableDataRecorder recorder) {
 		if (recorder instanceof SlotsDbProxy)
