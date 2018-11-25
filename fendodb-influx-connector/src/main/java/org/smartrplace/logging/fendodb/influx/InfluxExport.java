@@ -4,13 +4,20 @@ import java.io.IOException;
 import java.lang.reflect.Field;
 import java.nio.file.InvalidPathException;
 import java.nio.file.Paths;
+import java.time.DateTimeException;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeFormatterBuilder;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
@@ -30,6 +37,7 @@ import org.ogema.core.channelmanager.measurements.SampledValue;
 import org.ogema.tools.timeseries.iterator.api.MultiTimeSeriesIterator;
 import org.ogema.tools.timeseries.iterator.api.MultiTimeSeriesIteratorBuilder;
 import org.ogema.tools.timeseries.iterator.api.SampledValueDataPoint;
+import org.osgi.service.component.ComponentException;
 import org.osgi.service.component.ComponentServiceObjects;
 import org.osgi.service.component.annotations.Activate;
 import org.osgi.service.component.annotations.Component;
@@ -39,6 +47,7 @@ import org.osgi.service.metatype.annotations.Designate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.smartrplace.logging.fendodb.CloseableDataRecorder;
+import org.smartrplace.logging.fendodb.DataRecorderReference;
 import org.smartrplace.logging.fendodb.FendoDbConfiguration;
 import org.smartrplace.logging.fendodb.FendoDbConfigurationBuilder;
 import org.smartrplace.logging.fendodb.FendoDbFactory;
@@ -65,6 +74,53 @@ import org.smartrplace.logging.fendodb.tagging.api.LogDataTaggingConstants;
 // see https://github.com/influxdata/influxdb-java
 public class InfluxExport implements Runnable {
 	
+	/**
+	 * A date-time formatter
+	 */
+	private final static DateTimeFormatter DEFAULT_FORMATTER_PARSE_WITH_ZONE = new DateTimeFormatterBuilder()
+			.appendPattern("yyyy")
+			.optionalStart()
+				.appendPattern("-MM")
+				.optionalStart()
+					.appendPattern("-dd")
+					.optionalStart()
+						.appendPattern("'T'HH")
+						.optionalStart()
+							.appendPattern(":mm")
+							.optionalStart()
+								.appendPattern(":ss")
+							.optionalEnd()
+						.optionalEnd()
+					.optionalEnd()
+				.optionalEnd()
+			.optionalEnd()
+			.optionalStart()
+				.appendZoneOrOffsetId()
+			.optionalEnd()
+			.toFormatter(Locale.ENGLISH);
+	
+	/**
+	 * A date-time formatter without time zone
+	 */
+	private final static DateTimeFormatter DEFAULT_FORMATTER_PARSE_NO_ZONE = new DateTimeFormatterBuilder()
+			.appendPattern("yyyy")
+			.optionalStart()
+				.appendPattern("-MM")
+				.optionalStart()
+					.appendPattern("-dd")
+					.optionalStart()
+						.appendPattern("'T'HH")
+						.optionalStart()
+							.appendPattern(":mm")
+							.optionalStart()
+								.appendPattern(":ss")
+							.optionalEnd()
+						.optionalEnd()
+					.optionalEnd()
+				.optionalEnd()
+			.optionalEnd()
+			.toFormatter(Locale.ENGLISH);
+	
 	private static final String UNKNOWN_FIELD_TYPE = "value";
 	private static final List<String> measurementTypes = Arrays.asList(
 			   "temperature",
@@ -82,23 +138,29 @@ public class InfluxExport implements Runnable {
 	
 	private InfluxDB influx;
 	private InfluxConfig config;
+	private long startTime = Long.MIN_VALUE;
+	private long endTime = Long.MAX_VALUE;
 	private final CompletableFuture<InfluxDB> future = new CompletableFuture<>();
+	private final Logger logger = LoggerFactory.getLogger(getClass());
 	
 	@Activate
 	protected void activate(InfluxConfig config) throws InterruptedException {
 		this.config = config;
+		if (!config.startTime().isEmpty())
+			startTime = parseTimestamp(config.startTime());
+		if (!config.endTime().isEmpty())
+			endTime = parseTimestamp(config.endTime());
 		this.influx  = InfluxDBFactory.connect(config.url(), config.user(), config.pw());
 		influx.setDatabase(config.influxdb());
 		future.thenAcceptAsync(this::createDb);
 		if (!ping()) {
-			LoggerFactory.getLogger(getClass()).info("InfluxDb is not reachable");
+			logger.info("InfluxDb is not reachable");
 			return;
 		}
 	}
 
 	@Override
 	public void run() {
-		final Logger logger = LoggerFactory.getLogger(getClass());
 		logger.info("Uploading FendoDb data to InfluxDb");
 		if (!ping()) {
 			logger.info("InfluxDb is not reachable");
@@ -117,7 +179,7 @@ public class InfluxExport implements Runnable {
 							.setReadOnlyMode(true)
 							.build();
 						try {
-							final long size = transfer(reference.getDataRecorder(config), reference.getPath().toString().replace('\\', '/'));
+							final long size = transfer(reference.getDataRecorder(config), getMeasurementId(reference));
 							logger.info("Uploaded {} data points for FendoDb {}", size, reference.getPath());
 						} catch (IOException | SecurityException e) {
 							logger.warn("Failed to transfer FendoDb data",e);
@@ -157,12 +219,12 @@ public class InfluxExport implements Runnable {
 			});
 		try {
 			if (!latch.await(60, TimeUnit.SECONDS)) {
-				LoggerFactory.getLogger(getClass()).info("Database creation request timed out");
+				logger.info("Database creation request timed out");
 			}
 			else if (error.get() != null) {
-				LoggerFactory.getLogger(getClass()).info("Database creation request failed: {}", error.get());
+				logger.info("Database creation request failed: {}", error.get());
 			} else {
-				LoggerFactory.getLogger(getClass()).info("Database created: {}", results.get());
+				logger.info("Database created: {}", results.get());
 			}
 		} catch (InterruptedException e) {
 			Thread.currentThread().interrupt();
@@ -212,13 +274,15 @@ public class InfluxExport implements Runnable {
 			while (true) {
 				if (max == Long.MAX_VALUE)
 					break;
+				final long start = Math.max(max + 1, startTime);
+				if (start > endTime)
+					break;
 				final List<Point> points;
 				if (timeSeries.size() == 1) 
-					points = getPoints(timeSeries.get(0).getPath(), timeSeries.get(0).iterator(max+1, Long.MAX_VALUE), measurementId, fieldIds.get(0));
+					points = getPoints(timeSeries.get(0).getPath(), timeSeries.get(0).iterator(start, endTime), measurementId, fieldIds.get(0));
 				else {
-					final long max1 = max;
 					final MultiTimeSeriesIterator it = 
-							MultiTimeSeriesIteratorBuilder.newBuilder(timeSeries.stream().map(t -> t.iterator(max1+1, Long.MAX_VALUE)).collect(Collectors.toList())).build();
+							MultiTimeSeriesIteratorBuilder.newBuilder(timeSeries.stream().map(t -> t.iterator(start, endTime)).collect(Collectors.toList())).build();
 					points = getPoints(timeSeries.stream().map(FendoTimeSeries::getPath).collect(Collectors.toList()), it, measurementId, fieldIds);
 				}
 				if (points.isEmpty())
@@ -284,11 +348,11 @@ public class InfluxExport implements Runnable {
 				latch.countDown();
 			});
 		if (!latch.await(30, TimeUnit.SECONDS)) {
-			LoggerFactory.getLogger(getClass()).warn("Request timed out");
+			logger.warn("Request timed out");
 			return null;
 		}
 		if (error.get() != null) {
-			LoggerFactory.getLogger(getClass()).warn("Request failed",error.get());
+			logger.warn("Request failed",error.get());
 			return null;
 		}
 		return results.get();
@@ -350,6 +414,36 @@ public class InfluxExport implements Runnable {
 	@Override
 	public String toString() {
 		return "FendoDB -> InfluxDB Export [FendoDB: " + config.fendodb() + ", InfluxDB: " + config.url() + ":" + config.influxdb() + "]";
+	}
+	
+	private final String getMeasurementId(final DataRecorderReference ref) {
+		String s0 = ref.getPath().toString().replace('\\', '/');
+		if (config.fendodb().endsWith("*") && config.fendodb().length() > 1) {
+			final String prefix = config.fendodb().substring(0, config.fendodb().indexOf('*'));
+			if (s0.startsWith(prefix))
+				s0 = s0.substring(prefix.length());
+				if (s0.startsWith("/"))
+					s0 = s0.substring(1);
+		}
+		return s0;
+	}
+	
+	private static Long parseTimestamp(final String in) {
+		try {
+			return Long.parseLong(in);
+		} catch (NumberFormatException expected) {}
+		try {
+			return ZonedDateTime.from(DEFAULT_FORMATTER_PARSE_WITH_ZONE.parse(in)).toInstant().toEpochMilli();
+		} catch (DateTimeException expected) {}
+		try {
+			return ZonedDateTime.of(LocalDateTime.from(DEFAULT_FORMATTER_PARSE_NO_ZONE.parse(in)), ZoneId.systemDefault()).toInstant().toEpochMilli();
+		} catch (DateTimeException expected) {
+		}
+		try {
+			return ZonedDateTime.of(LocalDateTime.of(LocalDate.from(DEFAULT_FORMATTER_PARSE_NO_ZONE.parse(in)), LocalTime.MIN), ZoneId.systemDefault()).toInstant().toEpochMilli();
+		} catch (DateTimeException expected) {
+		}
+		throw new ComponentException("Unsupported time format " + in);
 	}
 	
 }
