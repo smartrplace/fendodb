@@ -213,6 +213,7 @@ public final class FileObjectProxy {
 	 */
 	final List<Path> reloadDays() throws IOException {
 		cache.clearCache();
+		clearOpenFilesHashMap();
 		final List<Path> oldDays = this.days;
 		final int oldSize = oldDays.size();
 		this.days = loadDays(rootNode, useCompatibilityMode);
