@@ -14,6 +14,7 @@ import java.util.Collections;
 import java.util.Enumeration;
 import java.util.Iterator;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -24,14 +25,26 @@ import javax.servlet.http.HttpServletResponse;
 
 import org.ogema.core.application.Application;
 import org.ogema.core.application.ApplicationManager;
+import org.ogema.webadmin.AdminWebAccessManager;
+import org.ogema.webadmin.AdminWebAccessManager.StaticRegistration;
 import org.osgi.framework.Bundle;
 import org.osgi.framework.BundleContext;
 import org.osgi.service.component.annotations.Activate;
 import org.osgi.service.component.annotations.Component;
+import org.osgi.service.component.annotations.ConfigurationPolicy;
+import org.osgi.service.metatype.annotations.AttributeDefinition;
+import org.osgi.service.metatype.annotations.Designate;
+import org.osgi.service.metatype.annotations.ObjectClassDefinition;
 
-@Component(service=Application.class)
+@Component(
+		service=Application.class,
+		configurationPid = FendodbGrafanaApp.PID,
+		configurationPolicy = ConfigurationPolicy.OPTIONAL
+)
+@Designate(ocd=FendodbGrafanaApp.Config.class)
 public class FendodbGrafanaApp extends HttpServlet implements Application {
 
+	public static final String PID = "org.smartrplace.logging.FendoDbGrafana";
 	static final String FOLDER = "configs"; 
 	static final String GLOBAL_CONFIGS = "global";
 	static final String USER_CONFIGS = "users";
@@ -43,12 +56,22 @@ public class FendodbGrafanaApp extends HttpServlet implements Application {
 	private volatile WeakReference<List<String>> globalConfigsList = new WeakReference<>(null);
 	private Path baseFolder;
 	private Bundle thisBundle;
+	private Config config;
+	
+	@ObjectClassDefinition
+	@interface Config {
+		
+		@AttributeDefinition(description="URL replacing '/org/ogema/tools/grafana-base'", defaultValue="")
+		String remoteResources() default "";
+		
+	}
 	
 	@Activate
-	protected void activate(BundleContext ctx) throws IOException {
+	protected void activate(BundleContext ctx, Config config) throws IOException {
 		this.baseFolder = ctx.getDataFile(FendodbGrafanaApp.FOLDER).toPath().resolve(FendodbGrafanaApp.GLOBAL_CONFIGS);
 		Files.createDirectories(baseFolder);
 		thisBundle = ctx.getBundle();
+		this.config = config;
 	}
 
 	@Override
@@ -60,6 +83,21 @@ public class FendodbGrafanaApp extends HttpServlet implements Application {
 		appManager.getWebAccessManager().registerWebResource(WEB_PATH + "/servlet", this);
 		appManager.getWebAccessManager().registerWebResource(WEB_PATH + "/viz", "webresources");
 		appManager.getWebAccessManager().registerWebResource(WEB_PATH + "/upload", new ConfigFileUpload(basePath, () -> globalConfigsList = new WeakReference<>(null)));
+		final String remote = config.remoteResources();
+		if (remote != null && !remote.trim().isEmpty()) {
+			final AtomicReference<StaticRegistration> ref = new AtomicReference<AdminWebAccessManager.StaticRegistration>(null);
+			try {
+				final String browserPath2 = WEB_PATH + "/viz/index2.html";
+				final RemoteResourcesPage page = new RemoteResourcesPage(remote.trim(), thisBundle, ref);
+				final StaticRegistration reg = ((AdminWebAccessManager) appManager.getWebAccessManager()).registerStaticWebResource(browserPath2, page);
+				ref.set(reg);
+				if (Boolean.getBoolean("org.ogema.gui.usecdn")) {
+	        	  	 appManager.getWebAccessManager().registerStartUrl(browserPath2);
+	        	 }
+			} catch (IOException | SecurityException e) {
+				appManager.getLogger().warn("Failed to register remote resources page",e);
+			}
+		}
 	}
 	
 	@Override
@@ -68,6 +106,11 @@ public class FendodbGrafanaApp extends HttpServlet implements Application {
 			appMan.getWebAccessManager().unregisterWebResource(WEB_PATH + "/upload");
 			appMan.getWebAccessManager().unregisterWebResource(WEB_PATH + "/servlet");
 			appMan.getWebAccessManager().unregisterWebResource(WEB_PATH + "/viz");
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		try {
+			appMan.getWebAccessManager().unregisterWebResource(WEB_PATH + "/viz/index2.html");
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
