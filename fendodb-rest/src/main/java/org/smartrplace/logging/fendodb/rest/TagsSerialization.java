@@ -75,6 +75,8 @@ class TagsSerialization {
 	
 	static void serializeTags(final FendoTimeSeries timeSeries, final Writer writer, final int format, 
 			final char[] indentation, final char[] lineBreak, final AtomicBoolean first) {
+		if (timeSeries == null) // should not happen...
+			return;
 		try {
 			if (format == 1) {
 				writer.write(lineBreak);

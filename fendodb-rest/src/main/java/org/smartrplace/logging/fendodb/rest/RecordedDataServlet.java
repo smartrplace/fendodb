@@ -455,8 +455,10 @@ public class RecordedDataServlet extends HttpServlet {
             case Parameters.TARGET_TAGS:
                 final List<FendoTimeSeries> ids;
                 final String id0 = req.getParameter(Parameters.PARAM_ID);
-                if (id0 != null)
-                	ids = Collections.singletonList(recorder.getRecordedDataStorage(id0));
+                if (id0 != null) {
+                	final FendoTimeSeries fts = recorder.getRecordedDataStorage(id0);
+                	ids = fts != null ? Collections.singletonList(fts) : Collections.emptyList();
+                }
                 else
                 	ids = recorder.getAllTimeSeries();
             	TagsSerialization.serializeTags(ids, resp.getWriter(), format, indentation, lineBreak);
@@ -1122,6 +1124,8 @@ public class RecordedDataServlet extends HttpServlet {
     	writer.write("\"points\": [");
     	int cnt = 0;
     	while (values.hasNext() && cnt++ < maxNrValues) {
+    		if (cnt > 1)
+    			writer.write(',');
     		if (doIndent) {
     			writer.write('\n');
         		writer.write(indent);
@@ -1134,8 +1138,6 @@ public class RecordedDataServlet extends HttpServlet {
     		writer.write(' ');
     		writer.write(String.valueOf(factorOffset == null ? sv.getValue().getFloatValue() : getValue(sv.getValue().getFloatValue(), factorOffset)));
     		writer.write(']');
-    		if (values.hasNext())
-    			writer.write(',');
     	}
     	if (doIndent) {
     		writer.write('\n');
