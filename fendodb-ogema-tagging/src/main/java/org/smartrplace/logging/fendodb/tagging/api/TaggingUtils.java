@@ -22,11 +22,16 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.OptionalInt;
+import java.util.stream.Collectors;
 
 import org.ogema.core.model.Resource;
+import org.ogema.core.model.ResourceList;
 import org.ogema.core.model.simple.StringResource;
 import org.ogema.core.resourcemanager.ResourceAccess;
 import org.ogema.model.actors.Actor;
+import org.ogema.model.connections.ElectricityConnection;
 import org.ogema.model.devices.buildingtechnology.ElectricLight;
 import org.ogema.model.devices.buildingtechnology.Thermostat;
 import org.ogema.model.devices.generators.CombinedHeatAndPowerGenerator;
@@ -166,6 +171,7 @@ public class TaggingUtils {
 			checkForApplicationDomain(p, result);
 			checkForDataType(p, result);
 			checkForBuilding(p, result);
+			checkForPhase(p, result);
 			try {
 				p = p.getParent();
 			} catch (SecurityException e) {
@@ -213,6 +219,56 @@ public class TaggingUtils {
 				addProperty(result, LogDataTaggingConstants.DEVICE_TYPE_GENERIC, Actor.class.getSimpleName());
 		}
 		return result;
+	}
+	
+	private static Integer extractTrailingInt(String name) {
+		final StringBuilder sb= new StringBuilder();
+		for (int i=name.length()-1; i>= 0; i--) {
+			final char c = name.charAt(i);
+			if (!Character.isDigit(c))
+				break;
+			sb.append(c);
+		}
+		if (sb.length() == 0)
+			return null;
+		return Integer.parseInt(sb.toString());
+	}
+	
+	private final static void checkForPhase(final Resource p, final Map<String, List<String>> result) {
+		if (result.containsKey(LogDataTaggingConstants.PHASE))
+			return;
+		Resource parent = null;
+		for (int i=0; i<2; i++) {
+			parent = p.getParent();
+			if (parent == null)
+				return;
+		}
+		if (!(parent instanceof ElectricityConnection))
+			return;
+		final ElectricityConnection conn = (ElectricityConnection) parent;
+		if (conn.subPhaseConnections().exists()) {
+			addProperty(result, LogDataTaggingConstants.PHASE, "total");
+			return;
+		}
+		parent = parent.getParent();
+		if (parent instanceof ResourceList<?> && parent.getName().equals("subPhaseConnections")) {
+			final Integer ownIndex = extractTrailingInt(conn.getName());
+			if (ownIndex == null)
+				return;
+			final List<String> phaseNames = ((ResourceList<?>) parent).getAllElements().stream()
+				.map(Resource::getName)
+				.collect(Collectors.toList());
+			final OptionalInt opt = phaseNames.stream()
+				.map(TaggingUtils::extractTrailingInt)
+				.filter(Objects::nonNull)
+				.mapToInt(Integer::intValue)
+				.min();
+			if (!opt.isPresent())
+				return;
+			final int min = opt.getAsInt();
+			final int newIdx = ownIndex - (min - 1); // phases shall start with index 1
+			addProperty(result, LogDataTaggingConstants.PHASE, "phase" + newIdx);
+		}
 	}
 
 	private final static void checkForDataType(final Resource p, final Map<String, List<String>> result) {

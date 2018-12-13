@@ -143,7 +143,7 @@ return function(callback) {
 					})
 				);
 			return Promise.all(tagsPromises).then(() => {
-				Object.keys(tags).forEach(tag => {
+				Object.keys(tags).forEach(tag => { // tag = {id : [properties objects]}
 					const row = {
 					      "title": tag,
 					      "height": "500px",
@@ -205,11 +205,14 @@ return function(callback) {
 					      ],
 					      "collapse": false
 					    };
+					
 					tags[tag].forEach(id => {
+						let isPowerInfo = false;
 						const target = {
 				        	  "column": "value",
 				        	  "target": "mean('" + db + ":" + id + "')",
-				        	  "series": db + ":" + id
+				        	  "series": db + ":" + id,
+				        	  "function": "{$roomName}|{$roomPath}|" + tag + "||{$deviceName}|{$timeseries}"
 							};
 						if (tag === "Temperature") {
 							target.column = target.column + "-273.15";
@@ -221,15 +224,21 @@ return function(callback) {
 						}
 						else if (tag.indexOf("Power") >= 0) {
 							row.panels[0].leftYAxisLabel = "W";
+							isPowerInfo = true;
 						}
 						else if (tag.indexOf("Energy") >= 0) {
 							row.panels[0].leftYAxisLabel = "J";
 						}
 						else if (tag === "ElectricCurrent") {
 							row.panels[0].leftYAxisLabel = "A";
+							isPowerInfo = true;
 						}
 						else if (tag === "ElectricVoltage") {
 							row.panels[0].leftYAxisLabel = "V";
+							isPowerInfo = true;
+						}
+						if (isPowerInfo) {
+							target["function"] ="{$roomName}|{$roomPath}|" + tag + "||{$deviceName}_{$phase}|{$timeseries}"; 
 						}
 						row.panels[0].targets.push(target);
 					});

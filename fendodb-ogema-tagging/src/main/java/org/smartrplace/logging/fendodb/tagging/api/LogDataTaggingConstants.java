@@ -97,4 +97,16 @@ public class LogDataTaggingConstants {
 	 */
 	public static final String GATEWAY_ID = "gatewayId";
 	
+	/**
+	 * Specific for electricity: phase information. Values:
+	 * <ul>
+	 * 	 <li>total
+	 *   <li>phase1
+	 *   <li>phase2
+	 *   <li>phase3
+	 *   <li>...
+	 * </ul>
+	 */
+	public static final String PHASE = "phase";
+	
 }
