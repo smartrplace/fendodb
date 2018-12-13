@@ -47,8 +47,13 @@ import org.ogema.core.administration.FrameworkClock;
 import org.ogema.core.channelmanager.measurements.SampledValue;
 import org.ogema.core.recordeddata.RecordedDataConfiguration;
 import org.ogema.core.recordeddata.RecordedDataConfiguration.StorageType;
+import org.ogema.core.timeseries.InterpolationMode;
 import org.ogema.recordeddata.DataRecorderException;
+import org.ogema.tools.timeseries.iterator.api.MultiTimeSeriesIterator;
+import org.ogema.tools.timeseries.iterator.api.MultiTimeSeriesIteratorBuilder;
+import org.osgi.framework.BundleContext;
 import org.osgi.service.component.ComponentServiceObjects;
+import org.osgi.service.component.annotations.Activate;
 import org.osgi.service.component.annotations.Component;
 import org.osgi.service.component.annotations.Reference;
 import org.osgi.service.component.annotations.ReferenceCardinality;
@@ -75,7 +80,11 @@ import org.smartrplace.logging.fendodb.tools.config.FendodbSerializationFormat;
 	}
 )
 public class RecordedDataServlet extends HttpServlet {
-
+	
+	private static final String PROPERTY_DEFAULT_MAX_NR_VALUES = "org.smartrplace.logging.fendo.rest.max_nr_values";
+	private static final int DEFAULT_MAX_NR_VALUES = 20000;
+	private int MAX_NR_VALUES;
+	
 //	private static final Logger logger = LoggerFactory.getLogger(RecordedDataServlet.class);
     private static final long serialVersionUID = 1L;
     public static final String CONTEXT = "org.smartrplace.logging.fendodb.rest";
@@ -94,6 +103,19 @@ public class RecordedDataServlet extends HttpServlet {
     	"application/xml",
     	"text/xml"
     };
+    
+    @Activate
+    protected void activate(BundleContext ctx) {
+    	int maxNr = 0;
+    	try {
+    		maxNr = Integer.parseInt(ctx.getProperty(PROPERTY_DEFAULT_MAX_NR_VALUES));
+    	} catch (NumberFormatException | SecurityException | NullPointerException ok) {}
+    	if (maxNr <= 0)
+    		maxNr = DEFAULT_MAX_NR_VALUES;
+    	MAX_NR_VALUES = maxNr;
+    }
+    
+    
 
     // ok to construct this eagerly, we need it anyway...
     @Reference
@@ -1059,8 +1081,22 @@ public class RecordedDataServlet extends HttpServlet {
     		final String db, final String query, final HttpServletRequest req) throws IOException {
     	final long start = getTime(query, query.indexOf(" time > "), true) * 1000;
     	final long end = getTime(query, query.indexOf(" time < "), false) * 1000;
-    	serializeToInfluxJson(timeSeries.iterator(start, end), writer, extractLabel(query, db, timeSeries), 
-    			getIndentFactor(req), getMaxNrValues(req), extractFactorAndOffset(query));
+    	final int maxNrValues = getMaxNrValues(req);
+    	final int sz = timeSeries.size(start, end);
+    	final Iterator<SampledValue> it;
+    	if (sz > maxNrValues) {
+    		final long actualStart = timeSeries.getNextValue(start).getTimestamp();
+    		final long actualEnd = timeSeries.getPreviousValue(end).getTimestamp();
+    		final long stepSize = Math.max((actualEnd - actualStart) / maxNrValues, 1);
+    		it = new MultiItWrapper(MultiTimeSeriesIteratorBuilder.newBuilder(Collections.singletonList(timeSeries.iterator(start, end)))
+    				.setStepSize(start, stepSize)
+    				.setGlobalInterpolationMode(InterpolationMode.LINEAR)
+    				.build());
+    	} else {
+    		it = timeSeries.iterator(start,end);
+    	}
+    	serializeToInfluxJson(it, writer, extractLabel(query, db, timeSeries), 
+    			getIndentFactor(req), maxNrValues, extractFactorAndOffset(query));
     }
     
     private final long now() {
@@ -1169,13 +1205,35 @@ public class RecordedDataServlet extends HttpServlet {
      	return idt;
     }
     
-    private static int getMaxNrValues(final HttpServletRequest req) {
+    private int getMaxNrValues(final HttpServletRequest req) {
     	final String maxVals = req.getParameter(Parameters.PARAM_MAX);
-    	int max = 10000;
+    	int max = 0;
         try {
         	max = Integer.parseInt(maxVals);
         } catch (NullPointerException | NumberFormatException e) {}
+        if (max <= 0)
+        	max = MAX_NR_VALUES;
         return max;
+    }
+    
+    private static class MultiItWrapper implements Iterator<SampledValue> {
+    	
+    	final MultiTimeSeriesIterator it;
+    	
+    	public MultiItWrapper(MultiTimeSeriesIterator it) {
+			this.it = it;
+		}
+
+		@Override
+		public boolean hasNext() {
+			return it.hasNext();
+		}
+
+		@Override
+		public SampledValue next() {
+			return it.next().getElement(0);
+		}
+		
     }
     
 }
