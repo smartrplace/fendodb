@@ -59,32 +59,40 @@ document.addEventListener("DOMContentLoaded", () => {
 				const currentProps = search.getAll("properties")
 					.map(p => p.split("="));
 				const propsMap ={};
-				currentProps.forEach(arr => propsMap[arr[0]] = arr[1]); 
+				currentProps.forEach(arr => {
+					if (!propsMap.hasOwnProperty(arr[0]))
+						propsMap[arr[0]] = [];
+					propsMap[arr[0]].push(arr[1]);
+				}); 
 				const allTags = Object.keys(tags).sort();
 				//const maxLength = allTags.map(t => t.length).reduce((a,b) => a > b ? a : b);
 				allTags.forEach(t => {
 				 	const container = document.createElement("div");
 				 	container.style["paddingRight"] = "3em";
-				 	const label = document.createElement("span");
-				 	const length = t.length;
+				 	const fs = document.createElement("fieldset");
+				 	const label = document.createElement("label");
 				 	label.innerText = "Select " + t + ":";
-				 	label.style["paddingRight"] = "1em";
-				 	container.appendChild(label);
+				 	//label.style["paddingRight"] = "1em";
+				 	fs.appendChild(label);
+				 	container.appendChild(fs);
 					const select = document.createElement("select");
 					select.dataset.tag = t;
+					select.multiple=true;
 					selectors.push(select);
 					container.appendChild(select);
+					/*
 					const unselected = document.createElement("option");
 					unselected.value = "all";
 					unselected.innerText = "all";
 					if (!propsMap.hasOwnProperty(t))
 						unselected.selected = true;
 					select.appendChild(unselected);
+					*/
 					tags[t].sort().forEach(val => {
 						const li = document.createElement("option");
 						li.value = val;
 						li.innerText = val;
-						if (propsMap.hasOwnProperty(t) && propsMap[t] === val)
+						if (propsMap.hasOwnProperty(t) && propsMap[t].indexOf(val) >= 0)
 							li.selected = true;
 						select.appendChild(li);
 					});
@@ -96,7 +104,12 @@ document.addEventListener("DOMContentLoaded", () => {
 	    		btn.value = "Apply";
 	    		btn.onclick = () => {
 	    		    search.delete("properties");
-	    		    selectors.filter(s => s.selectedOptions[0].value !== "all").forEach(s => search.append("properties",s.dataset.tag + "=" + s.selectedOptions[0].value));
+	    		    selectors
+	    		    	.filter(s => s.selectedOptions.length > 0)
+	    		    	.forEach(s => {
+	    		    		const sels = Array.from(s.selectedOptions).map(o => o.value);
+	    		    		sels.forEach(sel => search.append("properties",s.dataset.tag + "=" + sel));
+	    		    	});
 	    		    window.location.search = search.toString();
 	    		    /*
 	    		    window.location.search = search.toString(); // reloads page
