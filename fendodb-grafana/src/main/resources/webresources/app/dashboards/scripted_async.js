@@ -112,9 +112,13 @@ return function(callback) {
 					  "version": 6,
 					  "hideAllLegends": false
 					};
+			const timerange = search.get("timerange");
+			if (timerange)
+				dashboard.time.from = "now-" + timerange;
 			const db = search.get("db");
 			const tags = {};
 			const tagsPromises = response.trim().split(/\s+/)
+				.filter(id => id.length > 0)
 				.map(id => fetch("/rest/fendodb?target=tags&db=" + db + "&id=" + id + "&pw=" + otpwd, {
 					 	method: "GET",
 				        credentials: "omit",

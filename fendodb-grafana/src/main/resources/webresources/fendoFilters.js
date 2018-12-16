@@ -70,12 +70,15 @@ document.addEventListener("DOMContentLoaded", () => {
 				 	const container = document.createElement("div");
 				 	container.style["paddingRight"] = "3em";
 				 	const fs = document.createElement("fieldset");
+				 	fs.style["paddingTop"] = "1em";
 				 	const label = document.createElement("label");
 				 	label.innerText = "Select " + t + ":";
+				 	label.title = "Hold 'Ctrl' to select multiple values or deselect a single value"
 				 	//label.style["paddingRight"] = "1em";
 				 	fs.appendChild(label);
 				 	container.appendChild(fs);
 					const select = document.createElement("select");
+					select.dataset.tagselector = "true";
 					select.dataset.tag = t;
 					select.multiple=true;
 					selectors.push(select);
@@ -88,6 +91,15 @@ document.addEventListener("DOMContentLoaded", () => {
 						unselected.selected = true;
 					select.appendChild(unselected);
 					*/
+					const checkSelected = () => {
+						const isSelected = select.selectedOptions.length > 0;
+						if (isSelected) {
+							if (!label.classList.contains("selectedGroup"))
+								label.classList.add("selectedGroup");
+						} else {
+							label.classList.remove("selectedGroup");
+						}
+					};
 					tags[t].sort().forEach(val => {
 						const li = document.createElement("option");
 						li.value = val;
@@ -96,9 +108,73 @@ document.addEventListener("DOMContentLoaded", () => {
 							li.selected = true;
 						select.appendChild(li);
 					});
+					select.onclick = checkSelected;
+					checkSelected();
 					flex.appendChild(container);
 				});
 				snippet.appendChild(flex);
+
+				const timelabel =  document.createElement("span");
+	    		timelabel.innerText = "Select time range";
+	    		timelabel.style["marginRight"] = "1em";
+	    		const timerange = document.createElement("input");
+	    		timerange.type = "number";
+	    		timerange.min = "1";
+	    		timerange.step = "1";
+	    		timerange.style["marginRight"] = "1em";
+	    		timerange.value = "2";
+	    		timerange.style.width = "4em";
+	    		const units = document.createElement("select");
+	    		const years = document.createElement("option");
+	    		years.value = "y";
+	    		years.innerText = "years";
+	    		const months = document.createElement("option");
+	    		months.value = "M";
+	    		months.innerText = "months";
+	    		const days = document.createElement("option");
+		    	days.value = "d";
+	    		days.innerText = "days";
+	    		const hours = document.createElement("option");
+	    		hours.value = "h";
+	    		hours.innerText = "hours";
+	    		const minutes = document.createElement("option");
+	    		minutes.value = "m";
+	    		minutes.innerText = "minutes";
+	    		units.appendChild(years);
+	    		units.appendChild(months);
+	    		units.appendChild(days);
+	    		units.appendChild(hours);
+	    		units.appendChild(minutes);
+	    		units.style.width="10em";
+	    		units.value = "d";
+	    		const timeFlex = document.createElement("div");
+	    		timeFlex.style.display = "flex";
+	    		timeFlex.appendChild(timelabel);
+	    		timeFlex.appendChild(timerange);
+	    		timeFlex.appendChild(units);
+	    		
+	    		if (search.has("timerange")) {
+	    			const range = search.get("timerange");
+	    			if (range.length > 1) {
+	    				const num = parseInt(range.substring(0, range.length-1));
+	    				const unit = range[range.length-1];
+	    				if (!isNaN(num)) {
+	    					timerange.value = num + "";
+	    					units.value = unit;
+	    				}
+	    			}
+	    		}
+	    		
+	    		const deselect = document.createElement("input");
+				deselect.type = "button";
+				deselect.value = "Deselect all";
+				deselect.onclick = 
+					() => {
+							Array.from(snippet.querySelectorAll("select[data-tagselector]")).forEach(sel => {
+							Array.from(sel.options).forEach(opt => opt.selected = false);
+							sel.parentElement.querySelector("label").classList.remove("selectedGroup");
+						});
+					};
 				const btn = document.createElement("input");
 	    		btn.type = "button";
 	    		btn.value = "Apply";
@@ -110,12 +186,25 @@ document.addEventListener("DOMContentLoaded", () => {
 	    		    		const sels = Array.from(s.selectedOptions).map(o => o.value);
 	    		    		sels.forEach(sel => search.append("properties",s.dataset.tag + "=" + sel));
 	    		    	});
+	    		    const t0 = Number.parseInt(timerange.value);
+	    		    const tunit = units.value;
+	    		    if (!isNaN(t0)) {
+	    		    	search.set("timerange", t0 + tunit);
+	    		    }
 	    		    window.location.search = search.toString();
 	    		    /*
 	    		    window.location.search = search.toString(); // reloads page
 	    		    */
 	    		};
-	    		snippet.appendChild(btn);						
+	    		
+	    		const buttonsFlex = document.createElement("div");
+	    		buttonsFlex.style.display = "flex";
+	    		buttonsFlex.appendChild(deselect);
+	    		buttonsFlex.appendChild(btn);
+	    		deselect.style["marginRight"] = "1em";
+	    		
+	    		snippet.appendChild(timeFlex);	
+	    		snippet.appendChild(buttonsFlex);					
 			});
 	    			
 		};
