@@ -26,6 +26,7 @@ import org.smartrplace.logging.fendodb.DataRecorderReference;
 import org.smartrplace.logging.fendodb.FendoDbConfiguration;
 import org.smartrplace.logging.fendodb.accesscontrol.FendoDbAccessControl;
 
+// FIXME we should not need to create the instance just to get a reference!
 class FendoDbReference implements DataRecorderReference {
 
 	private volatile SlotsDb master;

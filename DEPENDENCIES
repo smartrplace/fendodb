@@ -6,11 +6,11 @@ Copyright 2018 Smartrplace UG
 // ------------------------------------------------------------------
 
 From: 'Fraunhofer Gesellschaft' (https://www.fraunhofer.de/)
-  - OGEMA Recordeddata SlotsDB (http://www.ogema.org) org.ogema.ref-impl:recordeddata-slotsdb:jar:2.1.3
-    License: GPL, Version 3.0  (https://www.gnu.org/licenses/gpl-3.0.en.html)
+  - OGEMA Recordeddata SlotsDB (http://www.ogema.org) org.ogema.ref-impl:recordeddata-slotsdb:jar:2.2.0
+    License: Apache License, Version 2.0  (http://www.apache.org/licenses/LICENSE-2.0.txt)
     (subproject fendodb-core, package org.smartrplace.logging.fendodb.impl)
-  - OGEMA REST interface (http://www.ogema.org) org.ogema.ref-impl:rest:jar:2.1.3
-    License: GPL, Version 3.0  (https://www.gnu.org/licenses/gpl-3.0.en.html)
+  - OGEMA REST interface (http://www.ogema.org) org.ogema.ref-impl:rest:jar:2.2.0
+    License: Apache License, Version 2.0  (http://www.apache.org/licenses/LICENSE-2.0.txt)
     (subproject fendodb-rest, class org.smartrplace.logging.fendodb.rest.RecordedDataFilter)
 
 // ------------------------------------------------------------------
@@ -34,12 +34,12 @@ From: 'QOS.ch' (http://www.qos.ch)
     License: MIT License  (http://www.opensource.org/licenses/mit-license.php)
 
 From: 'Fraunhofer Gesellschaft' (https://www.fraunhofer.de/)
-  - OGEMA API (http://www.ogema.org) org.ogema.core:api:jar:2.1.3
-  - OGEMA Models (http://www.ogema.org) org.ogema.core:models:jar:2.1.3
-  - OGEMA Internal API (http://www.ogema.org) org.ogema.ref-impl:internal-api:jar:2.1.3
-  - OGEMA Memory timeseries (http://www.ogema.org) org.ogema.tools:memory-timeseries:jar:2.1.3
-  - OGEMA Resource utils (http://www.ogema.org) org.ogema.tools:resource-utils:jar:2.1.3
-    License: GPL, Version 3.0  (https://www.gnu.org/licenses/gpl-3.0.en.html)
+  - OGEMA API (http://www.ogema.org) org.ogema.core:api:jar:2.2.0
+  - OGEMA Models (http://www.ogema.org) org.ogema.core:models:jar:2.2.0
+  - OGEMA Internal API (http://www.ogema.org) org.ogema.ref-impl:internal-api:jar:2.2.0
+  - OGEMA Memory timeseries (http://www.ogema.org) org.ogema.tools:memory-timeseries:jar:2.2.0
+  - OGEMA Resource utils (http://www.ogema.org) org.ogema.tools:resource-utils:jar:2.2.0
+    License: Apache License, Version 2.0  (http://www.apache.org/licenses/LICENSE-2.0.txt)
 
 From 'json.org' (http://json.org)
   - org.json (http://json.org) org.json:json:jar:20170516

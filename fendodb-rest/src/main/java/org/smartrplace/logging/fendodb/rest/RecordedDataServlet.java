@@ -115,9 +115,6 @@ public class RecordedDataServlet extends HttpServlet {
     	MAX_NR_VALUES = maxNr;
     }
     
-    
-
-    // ok to construct this eagerly, we need it anyway...
     @Reference
     private FendoDbFactory factory;
 
