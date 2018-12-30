@@ -9,9 +9,6 @@ From: 'Fraunhofer Gesellschaft' (https://www.fraunhofer.de/)
   - OGEMA Recordeddata SlotsDB (http://www.ogema.org) org.ogema.ref-impl:recordeddata-slotsdb:jar:2.2.0
     License: Apache License, Version 2.0  (http://www.apache.org/licenses/LICENSE-2.0.txt)
     (subproject fendodb-core, package org.smartrplace.logging.fendodb.impl)
-  - OGEMA REST interface (http://www.ogema.org) org.ogema.ref-impl:rest:jar:2.2.0
-    License: Apache License, Version 2.0  (http://www.apache.org/licenses/LICENSE-2.0.txt)
-    (subproject fendodb-rest, class org.smartrplace.logging.fendodb.rest.RecordedDataFilter)
 
 // ------------------------------------------------------------------
 // Dependencies of this product
