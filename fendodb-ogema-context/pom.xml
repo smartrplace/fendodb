@@ -4,7 +4,7 @@
     <parent>
 		<groupId>org.smartrplace.logging</groupId>
 	    <artifactId>fendodb-base</artifactId>
-	    <version>0.0.4-SNAPSHOT</version>
+	    <version>0.1.0</version>
     </parent>
 
     <artifactId>fendodb-ogema-context</artifactId>
@@ -70,7 +70,7 @@
 		<dependency>
 			<groupId>org.smartrplace.tools</groupId>
 			<artifactId>smartrplace-servlet-api</artifactId>
-			<version>0.0.1-SNAPSHOT</version><!-- FIXME -->
+			<version>0.0.1</version>
 		</dependency>
 		<!-- compile time only dependency -->
 		<dependency>

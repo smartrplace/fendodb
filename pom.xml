@@ -5,7 +5,7 @@
 
 	<groupId>org.smartrplace.logging</groupId>
 	<artifactId>fendodb-base</artifactId>
-	<version>0.0.4-SNAPSHOT</version>
+	<version>0.1.0</version>
 	<name>FendoDB timeseries database</name>
 	<description>FendoDB is a timeseries database targeted at IoT device log data, used in particular with OGEMA</description>
 	<packaging>pom</packaging>
@@ -122,7 +122,7 @@
 						<header>header.txt</header>
 						<keywords> <!-- existing license headers contain all of these keywords -->
 							<keyword>Smartrplace</keyword>
-							<keyword>GNU</keyword>
+							<keyword>Apache</keyword>
 							<keyword>License</keyword>
 						</keywords>
 						<properties>
@@ -303,12 +303,12 @@
 			<dependency>
 				<groupId>org.smartrplace.logging</groupId>
 				<artifactId>fendodb-api</artifactId>
-				<version>0.0.4-SNAPSHOT</version>
+				<version>0.1.0</version>
 			</dependency>
 			<dependency>
 				<groupId>org.smartrplace.logging</groupId>
 				<artifactId>fendodb-tools</artifactId>
-				<version>0.0.4-SNAPSHOT</version>
+				<version>0.1.0</version>
 			</dependency>
 		</dependencies>
 	</dependencyManagement>
