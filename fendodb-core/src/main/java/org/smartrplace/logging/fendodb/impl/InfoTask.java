@@ -35,15 +35,17 @@ abstract class InfoTask extends TimerTask {
 	final FileObjectProxy proxy;
 	private final LogLevel level;
 	private final boolean requiresFolderLock;
+	private final boolean runOnClose;
 
-	InfoTask(FileObjectProxy proxy, boolean requiresFolderLock) {
-		this(proxy, requiresFolderLock, LogLevel.INFO);
+	InfoTask(FileObjectProxy proxy, boolean requiresFolderLock, boolean runOnClose) {
+		this(proxy, requiresFolderLock, runOnClose, LogLevel.INFO);
 	}
 	
-	InfoTask(FileObjectProxy proxy, boolean requiresFolderLock, LogLevel level) {
+	InfoTask(FileObjectProxy proxy, boolean requiresFolderLock, boolean runOnClose, LogLevel level) {
 		this.proxy = proxy;
 		this.level = level;
 		this.requiresFolderLock = requiresFolderLock;
+		this.runOnClose = runOnClose;
 	}
 	
 	final boolean isRunning() {
@@ -78,7 +80,7 @@ abstract class InfoTask extends TimerTask {
 		try {
 			cancel();
 			boolean wasRunning = waitForTask();
-			if (!wasRunning) {
+			if (!wasRunning && runOnClose) {
 				run(); // execute task once more, so no data is lost
 			}
 		} catch (Exception e) {
@@ -117,7 +119,7 @@ abstract class InfoTask extends TimerTask {
 	static class Flusher extends InfoTask {
 		
 		Flusher(FileObjectProxy proxy) {
-			super(proxy, false, LogLevel.TRACE);
+			super(proxy, false, true, LogLevel.TRACE);
 		}
 		
 		@Override
@@ -135,7 +137,7 @@ abstract class InfoTask extends TimerTask {
 	static class DeleteJob extends InfoTask {
 		
 		DeleteJob(FileObjectProxy proxy) {
-			super(proxy, true);
+			super(proxy, true, false);
 		}
 		
 		@Override
@@ -197,7 +199,7 @@ abstract class InfoTask extends TimerTask {
 	static class SizeWatcher extends InfoTask {
 
 		SizeWatcher(FileObjectProxy proxy) {
-			super(proxy, true);
+			super(proxy, true, false);
 		}
 
 		@Override
@@ -251,7 +253,7 @@ abstract class InfoTask extends TimerTask {
 		DaysReloading(SlotsDb db) {
 			// actually requires a folder lock, but this is obtained in the method Slotsdb#reloadDays.. and MUST NOT be acquired earlier,
 			// otherwise the lock order policy would be violated
-			super(db.proxy, false);
+			super(db.proxy, false, false);
 			this.db = db;
 		}
 		

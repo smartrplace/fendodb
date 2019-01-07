@@ -246,7 +246,9 @@ return function(callback) {
 							isPowerInfo = true;
 						}
 						else if (tag.indexOf("Energy") >= 0) {
-							row.panels[0].leftYAxisLabel = "J";
+//							row.panels[0].leftYAxisLabel = "J";
+							target.column = target.column + "*2.7778e-7";
+							row.panels[0].leftYAxisLabel = "kWh";
 						}
 						else if (tag === "ElectricCurrent") {
 							row.panels[0].leftYAxisLabel = "A";

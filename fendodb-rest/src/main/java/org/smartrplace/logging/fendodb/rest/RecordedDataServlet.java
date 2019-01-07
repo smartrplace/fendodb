@@ -983,10 +983,16 @@ public class RecordedDataServlet extends HttpServlet {
     	}
     	else {
     		final StringBuilder sb = new StringBuilder();
-    		final int first = cnt;
+    		boolean first = true;
     		for (char c : sub.substring(cnt).toCharArray()) {
-    			if (Character.isDigit(c) || c == '.' || (cnt == first && (c == '+' || c== '-')))
+    			if (Character.isDigit(c) || c == '.' || (first && (c == '+' || c== '-'))) {
     				sb.append(c);
+    				first = false;
+    			}
+    			else if (c == 'e' || c == 'E') { // cover exponential factors
+    				sb.append(c);
+    				first = true;
+    			}
     			else
     				break;
     			cnt++;
@@ -995,10 +1001,16 @@ public class RecordedDataServlet extends HttpServlet {
     	}
     	if (cnt < sub.length()) {
     		final StringBuilder sb = new StringBuilder();
-    		final int first = cnt;
+    		boolean first = true;
     		for (char c : sub.substring(cnt).toCharArray()) {
-    			if (Character.isDigit(c) || c == '.' || (cnt == first && (c == '+' || c== '-')))
+    			if (Character.isDigit(c) || c == '.' || (first && (c == '+' || c== '-'))) {
     				sb.append(c);
+    				first = false;
+    			}
+    			else if (c == 'e' || c == 'E') { // cover exponential factors
+    				sb.append(c);
+    				first = true;
+    			}
     			else
     				break;
     			cnt++;
