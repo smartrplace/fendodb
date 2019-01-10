@@ -155,7 +155,8 @@ public class SlotsDbDataTagger implements Application, FendoDbFactory.SlotsDbLis
 		final ContinuousTagger tagger = (ContinuousTagger) this.continuousTagger;
 		if (tagger == null || !tagger.path.equals(db.getPath()))
 			return;
-		this.continuousTagger = null; // no need to close it when the db has been closed already; just avoid holding a reference to it
+		this.continuousTagger = null;
+		tagger.close();
 	}
 
 }

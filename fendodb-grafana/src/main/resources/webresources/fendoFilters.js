@@ -129,6 +129,7 @@ document.addEventListener("DOMContentLoaded", () => {
 				});
 				snippet.appendChild(flex);
 
+				// time range
 				const timelabel =  document.createElement("span");
 	    		timelabel.innerText = "Select time range";
 	    		timelabel.style["marginRight"] = "1em";
@@ -137,6 +138,7 @@ document.addEventListener("DOMContentLoaded", () => {
 	    		timerange.min = "1";
 	    		timerange.step = "1";
 	    		timerange.style["marginRight"] = "1em";
+	    		timerange.style["marginTop"] = "0.5em";
 	    		timerange.value = "2";
 	    		timerange.style.width = "4em";
 	    		const units = document.createElement("select");
@@ -161,9 +163,11 @@ document.addEventListener("DOMContentLoaded", () => {
 	    		units.appendChild(hours);
 	    		units.appendChild(minutes);
 	    		units.style.width="10em";
+	    		units.style["marginTop"] = "0.5em";
 	    		units.value = "d";
 	    		const timeFlex = document.createElement("div");
 	    		timeFlex.style.display = "flex";
+	    		timeFlex.style["align-items"] = "center";
 	    		timeFlex.appendChild(timelabel);
 	    		timeFlex.appendChild(timerange);
 	    		timeFlex.appendChild(units);
@@ -180,6 +184,82 @@ document.addEventListener("DOMContentLoaded", () => {
 	    			}
 	    		}
 	    		
+	    		// aggregation
+	    		const agglabel =  document.createElement("span");
+	    		agglabel.innerText = "Aggregate values?";
+	    		agglabel.style["marginRight"] = "1em";
+	    		const checkAgg = document.createElement("input");
+	    		checkAgg.type = "checkbox";
+	    		checkAgg.style["marginRight"] = "1em";
+	    		const aggrange = document.createElement("input");
+	    		aggrange.type = "number";
+	    		aggrange.min = "1";
+	    		aggrange.step = "1";
+	    		aggrange.style["marginRight"] = "1em";
+	    		aggrange.style["marginTop"] = "0.5em";
+	    		aggrange.value = "1";
+	    		aggrange.style.width = "4em";
+	    		aggrange.disabled = true;
+	    		const aggunits = document.createElement("select");
+	    		aggunits.disabled = true;
+	    		const years_agg = document.createElement("option");
+	    		years_agg.value = "y";
+	    		years_agg.innerText = "years";
+	    		const months_agg = document.createElement("option");
+	    		months_agg.value = "M";
+	    		months_agg.innerText = "months";
+	    		const days_agg = document.createElement("option");
+		    	days_agg.value = "d";
+	    		days_agg.innerText = "days";
+	    		const hours_agg = document.createElement("option");
+	    		hours_agg.value = "h";
+	    		hours_agg.innerText = "hours";
+	    		const minutes_agg = document.createElement("option");
+	    		minutes_agg.value = "m";
+	    		minutes_agg.innerText = "minutes";
+	    		aggunits.appendChild(years_agg);
+	    		aggunits.appendChild(months_agg);
+	    		aggunits.appendChild(days_agg);
+	    		aggunits.appendChild(hours_agg);
+	    		aggunits.appendChild(minutes_agg);
+	    		aggunits.style.width="10em";
+	    		aggunits.style["marginTop"] = "0.5em";
+	    		aggunits.value = "d";
+	    		const aggFlex = document.createElement("div");
+	    		aggFlex.style.display = "flex";
+	    		aggFlex.style["align-items"] = "center";
+	    		aggFlex.appendChild(agglabel);
+	    		aggFlex.appendChild(checkAgg);
+	    		aggFlex.appendChild(aggrange);
+	    		aggFlex.appendChild(aggunits);
+	    		
+	    		checkAgg.addEventListener('change', (event) => {
+	    			const checked = event.currentTarget.checked;
+	    			if (!checked) {
+	    				aggunits.disabled = true;
+	    				aggrange.disabled = true;
+	    			} else {
+	    				aggrange.removeAttribute("disabled");
+    					aggunits.removeAttribute("disabled");
+	    			}
+	    		});
+	    		
+	    		if (search.has("aggregate")) {
+	    			const range = search.get("aggregate");
+	    			if (range.length > 1) {
+	    				const num = parseInt(range.substring(0, range.length-1));
+	    				const unit = range[range.length-1];
+	    				if (!isNaN(num)) {
+	    					aggrange.value = num + "";
+	    					aggunits.value = unit;
+	    					aggrange.removeAttribute("disabled");
+	    					aggunits.removeAttribute("disabled");
+	    					checkAgg.checked = true;
+	    				}
+	    			}
+	    		}
+	    		
+	    		// deselect all button
 	    		const deselect = document.createElement("input");
 				deselect.type = "button";
 				deselect.value = "Deselect all";
@@ -205,11 +285,16 @@ document.addEventListener("DOMContentLoaded", () => {
 	    		    const tunit = units.value;
 	    		    if (!isNaN(t0)) {
 	    		    	search.set("timerange", t0 + tunit);
-	    		    }
+	    		    } 
+	    		    if (checkAgg.checked) {
+	    		    	const t1 = Number.parseInt(aggrange.value);
+	    		    	const aggun = aggunits.value;
+	    		    	if (!isNaN(t1)) {
+		    		    	search.set("aggregate", t1 + aggun);
+		    		    }
+	    		    } else 
+	    		    	search.delete("aggregate");
 	    		    window.location.search = search.toString();
-	    		    /*
-	    		    window.location.search = search.toString(); // reloads page
-	    		    */
 	    		};
 	    		
 	    		const buttonsFlex = document.createElement("div");
@@ -218,6 +303,7 @@ document.addEventListener("DOMContentLoaded", () => {
 	    		buttonsFlex.appendChild(btn);
 	    		deselect.style["marginRight"] = "1em";
 	    		
+	    		snippet.appendChild(aggFlex);	
 	    		snippet.appendChild(timeFlex);	
 	    		snippet.appendChild(buttonsFlex);					
 			});

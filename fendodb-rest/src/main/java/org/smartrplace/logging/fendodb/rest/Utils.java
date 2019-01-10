@@ -84,8 +84,6 @@ class Utils {
 	
 	public static long getLastAlignedTimestamp(final long startTime, final long duration) {
 		final ChronoUnit unit = getAlignmentUnit(duration);
-		// FIXME
-		System.out.println("   alignment unit " + unit + ": " + duration);
 		if (unit == null)
 			return startTime;
 		final ZonedDateTime zdt = toZdt(startTime);
@@ -107,9 +105,6 @@ class Utils {
 				}
 			}
 		}
-		// FIXME
-		System.out.println("    truncated instant " + truncated);
-		System.out.println("    original: " + zdt);
 		return truncated.toInstant().toEpochMilli();
 	}
 	

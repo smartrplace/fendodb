@@ -1104,7 +1104,6 @@ public class RecordedDataServlet extends HttpServlet {
 		return new String[] {db, path};
     }
     
-    // TODO aggregation
     private void serializeToInfluxJson(final FendoTimeSeries timeSeries, final PrintWriter writer, 
     		final String db, final String query, final HttpServletRequest req) throws IOException {
     	final long start = getTime(query, query.indexOf(" time > "), true) * 1000;
