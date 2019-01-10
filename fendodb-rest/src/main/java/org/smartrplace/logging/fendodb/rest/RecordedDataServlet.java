@@ -1121,15 +1121,18 @@ public class RecordedDataServlet extends HttpServlet {
     		final MultiTimeSeriesIteratorBuilder builder = MultiTimeSeriesIteratorBuilder.newBuilder(Collections.singletonList(timeSeries.iterator(start, end)))
     				.setStepSize(Utils.getLastAlignedTimestamp(start, aggregation), aggregation)
     				.setGlobalInterpolationMode(InterpolationMode.LINEAR);
-    		if (!doAccumulate)
-    			builder.doAverage(true); 
+    		long itOffset = 0;
+    		if (!doAccumulate) { 
+    			builder.doAverage(true);
+    			itOffset = -aggregation; // XXX semi-nice // we want to associate the aggregated value to the start of the interval (e.g. day), not the end
+    		}
     		else {
-//    			builder.doDiff(true); // new method in 2.2.1; use reflections to avoid snapshot dependency
+//    			builder.doDiff(true, 0); // new method in 2.2.1; use reflections to avoid snapshot dependency
     			try {
-    				builder.getClass().getMethod("doDiff", boolean.class).invoke(builder, true);
+    				builder.getClass().getMethod("doDiff", boolean.class, float.class).invoke(builder, true, 0F);
     			} catch (Exception ignore) {}
     		}
-    		it = new MultiItWrapper(builder.build());
+    		it = new MultiItWrapper(builder.build(), itOffset);
     	} else if (sz > maxNrValues) {
     		final long actualStart = timeSeries.getNextValue(start).getTimestamp();
     		final long actualEnd = timeSeries.getPreviousValue(end).getTimestamp();
@@ -1264,10 +1267,16 @@ public class RecordedDataServlet extends HttpServlet {
     
     private static class MultiItWrapper implements Iterator<SampledValue> {
     	
-    	final MultiTimeSeriesIterator it;
+    	private final MultiTimeSeriesIterator it;
+    	private final long offset;
     	
     	public MultiItWrapper(MultiTimeSeriesIterator it) {
+    		this(it, 0);
+    	}
+    	
+    	public MultiItWrapper(MultiTimeSeriesIterator it, long offset) {
 			this.it = it;
+			this.offset = offset;
 		}
 
 		@Override
@@ -1277,9 +1286,14 @@ public class RecordedDataServlet extends HttpServlet {
 
 		@Override
 		public SampledValue next() {
-			return it.next().getElement(0);
+			final SampledValue sv = it.next().getElement(0);
+			if (offset == 0)
+				return sv;
+			return new SampledValue(sv.getValue(), sv.getTimestamp() + offset, sv.getQuality());
 		}
 		
     }
+    
+    
     
 }
