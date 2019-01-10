@@ -130,6 +130,12 @@ return function(callback) {
 			const timerange = search.get("timerange");
 			if (timerange)
 				dashboard.time.from = "now-" + timerange;
+			else {
+				if (search.has("from")) 
+					dashboard.time.from=search.get("from");
+				if (search.has("to"))
+					dashboard.time.to=search.get("to");
+			}
 			const db = search.get("db");
 			const tags = {};
 			const tagsPromises = response.trim().split(/\s+/)

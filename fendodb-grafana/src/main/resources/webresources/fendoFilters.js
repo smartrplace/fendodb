@@ -128,6 +128,20 @@ document.addEventListener("DOMContentLoaded", () => {
 					flex.appendChild(container);
 				});
 				snippet.appendChild(flex);
+				
+				// keep time?
+	    		const keeplabel =  document.createElement("span");
+	    		keeplabel.innerText = "Keep time interval?";
+	    		keeplabel.style["marginRight"] = "1em";
+	    		const checkKeep = document.createElement("input");
+	    		checkKeep.type = "checkbox";
+	    		checkKeep.style["marginRight"] = "1em";
+	    		checkKeep.style["marginBottom"] = "0.5em";
+	    		const keepFlex = document.createElement("div");
+	    		keepFlex.style.display = "flex";
+	    		keepFlex.style["align-items"] = "center";
+	    		keepFlex.appendChild(keeplabel);
+	    		keepFlex.appendChild(checkKeep);
 
 				// time range
 				const timelabel =  document.createElement("span");
@@ -182,6 +196,10 @@ document.addEventListener("DOMContentLoaded", () => {
 	    					units.value = unit;
 	    				}
 	    			}
+	    		} else if (search.has("from") || search.has("to")) {
+	    			units.disabled = true;
+    				timerange.disabled = true;
+    				checkKeep.checked = true;
 	    		}
 	    		
 	    		// aggregation
@@ -244,6 +262,17 @@ document.addEventListener("DOMContentLoaded", () => {
 	    			}
 	    		});
 	    		
+	    		checkKeep.addEventListener('change', (event) => {
+	    			const checked = event.currentTarget.checked;
+	    			if (!checked) {
+	    				timerange.removeAttribute("disabled");
+    					units.removeAttribute("disabled");
+	    			} else {
+	    				units.disabled = true;
+	    				timerange.disabled = true;
+	    			}
+	    		});
+	    		
 	    		if (search.has("aggregate")) {
 	    			const range = search.get("aggregate");
 	    			if (range.length > 1) {
@@ -281,11 +310,20 @@ document.addEventListener("DOMContentLoaded", () => {
 	    		    		const sels = Array.from(s.selectedOptions).map(o => o.value);
 	    		    		sels.forEach(sel => search.append("properties",s.dataset.tag + "=" + sel));
 	    		    	});
-	    		    const t0 = Number.parseInt(timerange.value);
-	    		    const tunit = units.value;
-	    		    if (!isNaN(t0)) {
-	    		    	search.set("timerange", t0 + tunit);
-	    		    } 
+	    		    if (checkKeep.checked) {
+	    		    	const scope = angular.element($(document.querySelector("div[ng-bind]"))).scope();
+	    		    	search.set("from", scope.dashboard.time.from);
+	    		    	search.set("to", scope.dashboard.time.to);
+	    		    	search.delete("timerange");
+	    		    } else {
+		    		    const t0 = Number.parseInt(timerange.value);
+		    		    const tunit = units.value;
+		    		    if (!isNaN(t0)) {
+		    		    	search.set("timerange", t0 + tunit);
+		    		    } 
+		    		    search.delete("from");
+		    		    search.delete("to");
+	    			}
 	    		    if (checkAgg.checked) {
 	    		    	const t1 = Number.parseInt(aggrange.value);
 	    		    	const aggun = aggunits.value;
@@ -304,6 +342,7 @@ document.addEventListener("DOMContentLoaded", () => {
 	    		deselect.style["marginRight"] = "1em";
 	    		
 	    		snippet.appendChild(aggFlex);	
+	    		snippet.appendChild(keepFlex);	
 	    		snippet.appendChild(timeFlex);	
 	    		snippet.appendChild(buttonsFlex);					
 			});
