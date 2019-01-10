@@ -961,19 +961,28 @@ public class RecordedDataServlet extends HttpServlet {
     	return new String[] {primary, secondary};
     }
     
-    private static Float[] extractFactorAndOffset(final String query) {
+    /**
+     * @param query
+     * @return
+     *  	4-element array: Float, Float, Long, Boolean, all may be null
+     */
+    private static Object[] extractFactorAndOffset(final String query) {
     	final int idx = query.indexOf(" from \"");
     	if (idx < 0)
-    		return null;
+    		return new Object[4];
     	String sub = query.substring("select ".length(), idx);
     	final int lastOpen = sub.lastIndexOf('('); // "(value*2-2.3)"
     	final int lastClosed = sub.lastIndexOf(')');
     	if (lastOpen < 0 || lastClosed < lastOpen)
-    		return null;
+    		return new Object[4];
     	sub = sub.substring(lastOpen+1, lastClosed);
     	if (sub.length() <= "value".length()) // the default case
-    		return null;
-    	final int idxTimes = sub.indexOf('*');
+    		return new Object[4];
+    	// now sub should be a String of the form "value*2.7778e-7+17.2|aggregate=5m|accumulated=true",
+    	// with the |..|.. part being optional
+    	final String[] components = sub.split("\\|");
+    	final String factorOffsetStr = components[0];
+    	final int idxTimes = factorOffsetStr.indexOf('*');
     	final Float factor;
     	final Float offset;
     	int cnt = idxTimes + 1;
@@ -984,7 +993,7 @@ public class RecordedDataServlet extends HttpServlet {
     	else {
     		final StringBuilder sb = new StringBuilder();
     		boolean first = true;
-    		for (char c : sub.substring(cnt).toCharArray()) {
+    		for (char c : factorOffsetStr.substring(cnt).toCharArray()) {
     			if (Character.isDigit(c) || c == '.' || (first && (c == '+' || c== '-'))) {
     				sb.append(c);
     				first = false;
@@ -999,10 +1008,10 @@ public class RecordedDataServlet extends HttpServlet {
     		}
     		factor = Float.parseFloat(sb.toString());
     	}
-    	if (cnt < sub.length()) {
+    	if (cnt < factorOffsetStr.length()) {
     		final StringBuilder sb = new StringBuilder();
     		boolean first = true;
-    		for (char c : sub.substring(cnt).toCharArray()) {
+    		for (char c : factorOffsetStr.substring(cnt).toCharArray()) {
     			if (Character.isDigit(c) || c == '.' || (first && (c == '+' || c== '-'))) {
     				sb.append(c);
     				first = false;
@@ -1016,10 +1025,21 @@ public class RecordedDataServlet extends HttpServlet {
     			cnt++;
     		}
     		offset = Float.parseFloat(sb.toString());
+    		
     	} else {
     		offset = null;
     	}
-    	return new Float[] {factor, offset};
+    	Long aggregationTime = null;
+    	boolean doAccumulate = false;
+    	if (components.length > 1 && components[1].startsWith("aggregate=")) {
+    		final String aggTime = components[1].substring("aggregate=".length());
+    		aggregationTime = parseDuration(aggTime);
+    		if (components.length > 2 && components[2].startsWith("accumulated=")) {
+    			doAccumulate = Boolean.parseBoolean(components[2].substring("accumulated=".length()));
+    		}
+    	}
+    	
+    	return new Object[] {factor, offset, aggregationTime, doAccumulate};
     }
     
     /**
@@ -1084,14 +1104,34 @@ public class RecordedDataServlet extends HttpServlet {
 		return new String[] {db, path};
     }
     
+    // TODO aggregation
     private void serializeToInfluxJson(final FendoTimeSeries timeSeries, final PrintWriter writer, 
     		final String db, final String query, final HttpServletRequest req) throws IOException {
     	final long start = getTime(query, query.indexOf(" time > "), true) * 1000;
     	final long end = getTime(query, query.indexOf(" time < "), false) * 1000;
     	final int maxNrValues = getMaxNrValues(req);
     	final int sz = timeSeries.size(start, end);
+    	// Float, Float, Long, Boolean
+    	final Object[] factorOffsetAggregationAccumulated = extractFactorAndOffset(query);
+    	final Float factor = (Float) factorOffsetAggregationAccumulated[0];
+    	final Float offset = (Float) factorOffsetAggregationAccumulated[1];
+    	final Long aggregation = (Long) factorOffsetAggregationAccumulated[2];
+    	final boolean doAccumulate = factorOffsetAggregationAccumulated[3] == null ? false : (Boolean) factorOffsetAggregationAccumulated[3];
     	final Iterator<SampledValue> it;
-    	if (sz > maxNrValues) {
+    	if (aggregation != null && aggregation > 0) {
+    		final MultiTimeSeriesIteratorBuilder builder = MultiTimeSeriesIteratorBuilder.newBuilder(Collections.singletonList(timeSeries.iterator(start, end)))
+    				.setStepSize(Utils.getLastAlignedTimestamp(start, aggregation), aggregation)
+    				.setGlobalInterpolationMode(InterpolationMode.LINEAR);
+    		if (!doAccumulate)
+    			builder.doAverage(true); 
+    		else {
+//    			builder.doDiff(true); // new method in 2.2.1; use reflections to avoid snapshot dependency
+    			try {
+    				builder.getClass().getMethod("doDiff", boolean.class).invoke(builder, true);
+    			} catch (Exception ignore) {}
+    		}
+    		it = new MultiItWrapper(builder.build());
+    	} else if (sz > maxNrValues) {
     		final long actualStart = timeSeries.getNextValue(start).getTimestamp();
     		final long actualEnd = timeSeries.getPreviousValue(end).getTimestamp();
     		final long stepSize = Math.max((actualEnd - actualStart) / maxNrValues, 1);
@@ -1103,7 +1143,7 @@ public class RecordedDataServlet extends HttpServlet {
     		it = timeSeries.iterator(start,end);
     	}
     	serializeToInfluxJson(it, writer, extractLabel(query, db, timeSeries), 
-    			getIndentFactor(req), maxNrValues, extractFactorAndOffset(query));
+    			getIndentFactor(req), maxNrValues, factor, offset);
     }
     
     private final long now() {
@@ -1137,7 +1177,7 @@ public class RecordedDataServlet extends HttpServlet {
 	  }]
      */
     private static void serializeToInfluxJson(final Iterator<SampledValue> values, final PrintWriter writer, 
-    		final String[] labels, final int indentFactor, final int maxNrValues, final Float[] factorOffset) throws IOException {
+    		final String[] labels, final int indentFactor, final int maxNrValues, final Float factor, final Float offset) throws IOException {
     	final boolean doIndent = indentFactor > 0;
     	final String indent;
     	if (!doIndent)
@@ -1179,7 +1219,7 @@ public class RecordedDataServlet extends HttpServlet {
     		writer.write(String.valueOf(sv.getTimestamp()));
     		writer.write(',');
     		writer.write(' ');
-    		writer.write(String.valueOf(factorOffset == null ? sv.getValue().getFloatValue() : getValue(sv.getValue().getFloatValue(), factorOffset)));
+    		writer.write(String.valueOf(getValue(sv.getValue().getFloatValue(), factor, offset)));
     		writer.write(']');
     	}
     	if (doIndent) {
@@ -1193,11 +1233,11 @@ public class RecordedDataServlet extends HttpServlet {
     	writer.write(']');
     }
     
-    private static final float getValue(float v1, final Float[] factorOffset) {
-    	if (factorOffset[0] != null)
-    		v1 = v1 * factorOffset[0];
-    	if (factorOffset[1] != null)
-    		v1 = v1 + factorOffset[1];
+    private static final float getValue(float v1, final Float factor, Float offset) {
+    	if (factor != null)
+    		v1 = v1 * factor;
+    	if (offset != null)
+    		v1 = v1 + offset;
     	return v1;
     }
 

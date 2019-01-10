@@ -227,6 +227,7 @@ return function(callback) {
 					
 					tags[tag].forEach(id => {
 						let isPowerInfo = false;
+						let isAccumulated = tag.indexOf("Accumuled") >= 0;
 						const target = {
 				        	  "column": "value",
 				        	  "target": "mean('" + db + ":" + id + "')",
@@ -249,6 +250,7 @@ return function(callback) {
 //							row.panels[0].leftYAxisLabel = "J";
 							target.column = target.column + "*2.7778e-7";
 							row.panels[0].leftYAxisLabel = "kWh";
+							isAccumulated = true;
 						}
 						else if (tag === "ElectricCurrent") {
 							row.panels[0].leftYAxisLabel = "A";
@@ -260,6 +262,11 @@ return function(callback) {
 						}
 						if (isPowerInfo) {
 							target["function"] ="{$roomName}|{$roomPath}|" + tag + "||{$deviceName}_{$phase}|{$timeseries}"; 
+						}
+						if (search.has("aggregate")) {
+							target.column = target.column + "|aggregate=" + search.get("aggregate") + "|accumulated=" + isAccumulated;
+							row.panels[0].lines=false;
+							row.panels[0].bars=true;
 						}
 						row.panels[0].targets.push(target);
 					});

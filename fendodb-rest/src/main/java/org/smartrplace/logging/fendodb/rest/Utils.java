@@ -16,6 +16,7 @@
 package org.smartrplace.logging.fendodb.rest;
 
 import java.time.DateTimeException;
+import java.time.DayOfWeek;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -24,6 +25,8 @@ import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeFormatterBuilder;
+import java.time.temporal.ChronoUnit;
+import java.time.temporal.TemporalAdjusters;
 import java.util.Locale;
 import java.util.function.Function;
 
@@ -51,7 +54,65 @@ class Utils {
 			.toFormatter(Locale.ENGLISH);
 	
 	private final static ZoneId zone = ZoneId.of("Z");
+	private final static long HOUR = 3600000;
 
+	private static ZonedDateTime toZdt(long t) {
+		return ZonedDateTime.ofInstant(Instant.ofEpochMilli(t), zone);
+	}
+	
+	private static ChronoUnit getAlignmentUnit(final long duration) {
+		if (duration < 60000) // less than a minute
+			return null;
+		if (duration <= HOUR) {
+			if (duration % 60000 == 0 && HOUR % duration == 0)
+				return ChronoUnit.HOURS;
+			return null;
+		}
+		if (duration <= 24 * HOUR) {
+			if (duration % HOUR == 0 && (24 * HOUR) % duration == 0)
+				return ChronoUnit.DAYS;
+			return null;
+		}
+		if (duration == 7 * 24 * 60 * 60 * 1000)
+			return ChronoUnit.WEEKS;
+		if (duration == 30 * 24 * 60 * 60 * 1000)
+			return ChronoUnit.MONTHS;
+		if (duration == 365 * 24 * 60 * 60 * 1000)
+			return ChronoUnit.YEARS;
+		return null;
+	}
+	
+	public static long getLastAlignedTimestamp(final long startTime, final long duration) {
+		final ChronoUnit unit = getAlignmentUnit(duration);
+		// FIXME
+		System.out.println("   alignment unit " + unit + ": " + duration);
+		if (unit == null)
+			return startTime;
+		final ZonedDateTime zdt = toZdt(startTime);
+		ZonedDateTime truncated = zdt.truncatedTo(unit.isTimeBased() ? unit : ChronoUnit.DAYS);
+		if (unit.isDateBased() && !unit.equals(ChronoUnit.DAYS)) {
+			truncated = unit == ChronoUnit.WEEKS ? zdt.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY)) :
+						unit == ChronoUnit.MONTHS ? zdt.with(TemporalAdjusters.firstDayOfMonth()) : 
+						zdt.with(TemporalAdjusters.firstDayOfYear());
+		}
+		if ((unit.isTimeBased() || unit.equals(ChronoUnit.DAYS)) && duration < unit.getDuration().toMillis()) {
+			final ChronoUnit secondaryUnit = unit == ChronoUnit.HOURS ? ChronoUnit.MINUTES :
+				unit == ChronoUnit.DAYS ? ChronoUnit.HOURS : null;
+			if (secondaryUnit != null) {
+				final long factor = duration / secondaryUnit.getDuration().toMillis();
+				ZonedDateTime next = truncated;
+				while (next.compareTo(zdt) < 0) {
+					truncated = next;
+					next = next.plus(factor, secondaryUnit);
+				}
+			}
+		}
+		// FIXME
+		System.out.println("    truncated instant " + truncated);
+		System.out.println("    original: " + zdt);
+		return truncated.toInstant().toEpochMilli();
+	}
+	
 	public final static Long parseTimeString(final String time, final Long defaulValue) {
 		if (time == null || time.isEmpty())
 			return defaulValue;

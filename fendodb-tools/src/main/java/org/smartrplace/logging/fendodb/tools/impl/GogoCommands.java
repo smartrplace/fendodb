@@ -32,13 +32,10 @@ import java.util.List;
 import java.util.Locale;
 import java.util.stream.Collectors;
 
-import org.apache.felix.scr.annotations.Component;
-import org.apache.felix.scr.annotations.Properties;
-import org.apache.felix.scr.annotations.Property;
-import org.apache.felix.scr.annotations.Reference;
-import org.apache.felix.scr.annotations.Service;
 import org.apache.felix.service.command.Descriptor;
 import org.apache.felix.service.command.Parameter;
+import org.osgi.service.component.annotations.Component;
+import org.osgi.service.component.annotations.Reference;
 import org.smartrplace.logging.fendodb.CloseableDataRecorder;
 import org.smartrplace.logging.fendodb.FendoDbFactory;
 import org.smartrplace.logging.fendodb.FendoTimeSeries;
@@ -51,12 +48,15 @@ import org.smartrplace.logging.fendodb.tools.config.FendodbSerializationFormat;
 import org.smartrplace.logging.fendodb.tools.dump.DumpConfiguration;
 import org.smartrplace.logging.fendodb.tools.dump.DumpConfigurationBuilder;
 
-@Component
-@Properties({
-	@Property(name = "osgi.command.scope", value = "fendodb"),
-	@Property(name = "osgi.command.function", value = { "printTimeSeries", "fendoDbDump" }) })
-@Service(GogoCommands.class)
 @Descriptor("FendoDb commands")
+@Component(
+		service=GogoCommands.class,
+		property= {
+				"osgi.command.scope=fendodb",
+				"osgi.command.function=printTimeSeries", 
+				"osgi.command.function=fendoDbDump"
+		}
+)
 public class GogoCommands {
 
 	private final static DateTimeFormatter formatter = new DateTimeFormatterBuilder()
