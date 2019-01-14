@@ -108,4 +108,15 @@ public class LogDataTaggingConstants {
 	 */
 	public static final String PHASE = "phase";
 	
+	/**
+	 * Typical values:
+	 * <ul>
+	 * 	 <li>gas
+	 * 	 <li>water
+	 *   <li>coal
+	 *   <li>...
+	 * </ul>
+	 */
+	public static final String COMMODITY = "commodity";
+	
 }

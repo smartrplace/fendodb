@@ -230,10 +230,15 @@ return function(callback) {
 					      ],
 					      "collapse": false
 					    };
-					
+					const doAggregate = search.has("aggregate");
 					tags[tag].forEach(id => {
 						let isPowerInfo = false;
-						let isAccumulated = tag.indexOf("Accumuled") >= 0;
+						/*
+						 * 0: default (average value)
+						 * 1: integral
+						 * 2: difference
+						 */
+						let isAccumulated = tag.indexOf("Accumulated") >= 0 ? 2 : 0;
 						const target = {
 				        	  "column": "value",
 				        	  "target": "mean('" + db + ":" + id + "')",
@@ -249,14 +254,20 @@ return function(callback) {
 							row.panels[0].leftYAxisLabel = "%";
 						}
 						else if (tag.indexOf("Power") >= 0) {
-							row.panels[0].leftYAxisLabel = "W";
+							if (doAggregate) {
+								row.panels[0].leftYAxisLabel = "kWh";
+								isAccumulated = 1;
+								target.column = target.column + "*2.7778e-10";
+							} else {
+								row.panels[0].leftYAxisLabel = "W";
+							}
 							isPowerInfo = true;
 						}
 						else if (tag.indexOf("Energy") >= 0) {
 //							row.panels[0].leftYAxisLabel = "J";
 							target.column = target.column + "*2.7778e-7";
 							row.panels[0].leftYAxisLabel = "kWh";
-							isAccumulated = true;
+							isAccumulated = 2;
 						}
 						else if (tag === "ElectricCurrent") {
 							row.panels[0].leftYAxisLabel = "A";
@@ -269,7 +280,7 @@ return function(callback) {
 						if (isPowerInfo) {
 							target["function"] ="{$roomName}|{$roomPath}|" + tag + "||{$deviceName}_{$phase}|{$timeseries}"; 
 						}
-						if (search.has("aggregate")) {
+						if (doAggregate) {
 							target.column = target.column + "|aggregate=" + search.get("aggregate") + "|accumulated=" + isAccumulated;
 							row.panels[0].lines=false;
 							row.panels[0].bars=true;

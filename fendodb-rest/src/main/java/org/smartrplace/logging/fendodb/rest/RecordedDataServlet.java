@@ -964,7 +964,7 @@ public class RecordedDataServlet extends HttpServlet {
     /**
      * @param query
      * @return
-     *  	4-element array: Float, Float, Long, Boolean, all may be null
+     *  	4-element array: Float, Float, Long, Integer, all may be null
      */
     private static Object[] extractFactorAndOffset(final String query) {
     	final int idx = query.indexOf(" from \"");
@@ -978,7 +978,7 @@ public class RecordedDataServlet extends HttpServlet {
     	sub = sub.substring(lastOpen+1, lastClosed);
     	if (sub.length() <= "value".length()) // the default case
     		return new Object[4];
-    	// now sub should be a String of the form "value*2.7778e-7+17.2|aggregate=5m|accumulated=true",
+    	// now sub should be a String of the form "value*2.7778e-7+17.2|aggregate=5m|accumulated=1", 
     	// with the |..|.. part being optional
     	final String[] components = sub.split("\\|");
     	final String factorOffsetStr = components[0];
@@ -1030,16 +1030,21 @@ public class RecordedDataServlet extends HttpServlet {
     		offset = null;
     	}
     	Long aggregationTime = null;
-    	boolean doAccumulate = false;
+    	/*
+    	 * allowed values 0,1,2
+    	 */
+    	int accumulateIdx = 0;
     	if (components.length > 1 && components[1].startsWith("aggregate=")) {
     		final String aggTime = components[1].substring("aggregate=".length());
     		aggregationTime = parseDuration(aggTime);
     		if (components.length > 2 && components[2].startsWith("accumulated=")) {
-    			doAccumulate = Boolean.parseBoolean(components[2].substring("accumulated=".length()));
+    			try {
+    				accumulateIdx = Integer.parseInt(components[2].substring("accumulated=".length()));
+    			} catch (NumberFormatException e) {}
     		}
     	}
     	
-    	return new Object[] {factor, offset, aggregationTime, doAccumulate};
+    	return new Object[] {factor, offset, aggregationTime, accumulateIdx};
     }
     
     /**
@@ -1115,22 +1120,27 @@ public class RecordedDataServlet extends HttpServlet {
     	final Float factor = (Float) factorOffsetAggregationAccumulated[0];
     	final Float offset = (Float) factorOffsetAggregationAccumulated[1];
     	final Long aggregation = (Long) factorOffsetAggregationAccumulated[2];
-    	final boolean doAccumulate = factorOffsetAggregationAccumulated[3] == null ? false : (Boolean) factorOffsetAggregationAccumulated[3];
+    	final int accumulateIdx = factorOffsetAggregationAccumulated[3] == null ? 0 : (Integer) factorOffsetAggregationAccumulated[3];
     	final Iterator<SampledValue> it;
     	if (aggregation != null && aggregation > 0) {
     		final MultiTimeSeriesIteratorBuilder builder = MultiTimeSeriesIteratorBuilder.newBuilder(Collections.singletonList(timeSeries.iterator(start, end)))
     				.setStepSize(Utils.getLastAlignedTimestamp(start, aggregation), aggregation)
     				.setGlobalInterpolationMode(InterpolationMode.LINEAR);
     		long itOffset = 0;
-    		if (!doAccumulate) { 
-    			builder.doAverage(true);
-    			itOffset = -aggregation; // XXX semi-nice // we want to associate the aggregated value to the start of the interval (e.g. day), not the end
-    		}
-    		else {
+    		switch (accumulateIdx) {
+    		case 1:
+    			builder.doIntegrate(true);
+    			itOffset = -aggregation;
+    			break;
+			case 2:
 //    			builder.doDiff(true, 0); // new method in 2.2.1; use reflections to avoid snapshot dependency
-    			try {
+				try {
     				builder.getClass().getMethod("doDiff", boolean.class, float.class).invoke(builder, true, 0F);
     			} catch (Exception ignore) {}
+				break;
+			default:
+				builder.doAverage(true);
+    			itOffset = -aggregation;
     		}
     		it = new MultiItWrapper(builder.build(), itOffset);
     	} else if (sz > maxNrValues) {
