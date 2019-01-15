@@ -282,8 +282,10 @@ return function(callback) {
 						}
 						if (doAggregate) {
 							target.column = target.column + "|aggregate=" + search.get("aggregate") + "|accumulated=" + isAccumulated;
-							row.panels[0].lines=false;
-							row.panels[0].bars=true;
+							if (isAccumulated > 0) { // sensible for volume per day-like data, not for average temperatures, etc.
+								row.panels[0].lines=false;
+								row.panels[0].bars=true;
+							}
 						}
 						row.panels[0].targets.push(target);
 					});

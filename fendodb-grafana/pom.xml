@@ -69,7 +69,7 @@
 		<dependency>
 			<groupId>org.smartrplace.logging</groupId>
 			<artifactId>fendodb-rest</artifactId>
-			<version>${project.version}</version>
+			<version>${project.parent.version}</version>
 			<exclusions>
             	<exclusion>
             		<groupId>javax.servlet</groupId>

@@ -62,7 +62,7 @@
 		<dependency>
 			<groupId>org.smartrplace.logging</groupId>
 			<artifactId>fendodb-core</artifactId>
-			<version>${project.version}</version>
+			<version>${project.parent.version}</version>
 			<scope>test</scope>
 		</dependency>
 		<dependency>
