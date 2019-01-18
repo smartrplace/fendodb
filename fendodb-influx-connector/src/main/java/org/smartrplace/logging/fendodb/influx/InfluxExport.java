@@ -41,6 +41,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
 import org.influxdb.InfluxDB;
+import org.influxdb.InfluxDBException;
 import org.influxdb.InfluxDBFactory;
 import org.influxdb.dto.BatchPoints;
 import org.influxdb.dto.BoundParameterQuery.QueryBuilder;
@@ -69,10 +70,6 @@ import org.smartrplace.logging.fendodb.FendoDbFactory;
 import org.smartrplace.logging.fendodb.FendoTimeSeries;
 import org.smartrplace.logging.fendodb.tagging.api.LogDataTaggingConstants;
 
-/*
- * TODO
- *  - split into multiple measurements?
- */
 @Component(
 		service = Runnable.class,
 		configurationPid = InfluxConfig.PID,
@@ -190,13 +187,14 @@ public class InfluxExport implements Runnable {
 					.filter(entry -> entry.getKey().toString().replace('\\', '/').startsWith(prefix))
 					.map(Map.Entry::getValue)
 					.forEach(reference -> {
-						final FendoDbConfiguration config = FendoDbConfigurationBuilder.getInstance(reference.getConfiguration())
-							.setReadOnlyMode(true)
-							.build();
+						logger.debug("Starting upload for FendoDb {}", reference.getPath());
 						try {
+							final FendoDbConfiguration config = FendoDbConfigurationBuilder.getInstance(reference.getConfiguration())
+								.setReadOnlyMode(true)
+								.build();
 							final long size = transfer(reference.getDataRecorder(config), getMeasurementId(reference));
 							logger.info("Uploaded {} data points for FendoDb {}", size, reference.getPath());
-						} catch (IOException | SecurityException e) {
+						} catch (Exception e) {
 							logger.warn("Failed to transfer FendoDb data",e);
 						}	
 					});
@@ -283,6 +281,7 @@ public class InfluxExport implements Runnable {
 				.map(InfluxExport::getFieldNameFromProperties)
 				.collect(Collectors.toList());
 		long size = 0;
+		int failureCnt = 0;
 		try {
 			final Field timeField = Point.class.getDeclaredField("time");
 			timeField.setAccessible(true);
@@ -304,10 +303,18 @@ public class InfluxExport implements Runnable {
 					break;
 				final Point[] arr = new Point[points.size()];
 				points.toArray(arr);
-				final BatchPoints batchPoints = builder
+				try {
+					final BatchPoints batchPoints = builder
 						.points(arr)
 						.build();
 					influx.write(batchPoints);
+				} catch (InfluxDBException exc) { // typically the
+					if (failureCnt++ == 0) // retry once
+						continue;
+					logger.error("Failed to write timeseries {} in db {}. Nr points: {}", timeSeries, instance, points.size(), exc);
+					break;
+				}
+				failureCnt = 0;
 				size += arr.length; 
 				// max = arr[arr.length-1].time
 				max = ((Long) timeField.get(arr[arr.length-1])).longValue();

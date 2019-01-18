@@ -92,6 +92,16 @@ public class LogDataTaggingConstants {
 	public static final String DATA_TYPE = "dataType";
 	
 	/**
+	 * Relevant if {@link #DATA_TYPE} is "setpoint". Typical values:
+	 * <ul>
+	 * 	<li>managementSetting: for a setpoint that is being set on the gateway, either by an app 
+	 * 		or via user interaction
+	 *  <li>deviceFeedback: for a setpoint that is reported back by an external device to the gateway
+	 * </ul>
+	 */
+	public static final String SETPOINT_TYPE = "setpointType";
+	
+	/**
 	 * The gateway id
 	 */
 	public static final String GATEWAY_ID = "gatewayId";

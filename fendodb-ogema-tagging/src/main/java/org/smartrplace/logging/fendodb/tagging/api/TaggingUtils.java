@@ -282,8 +282,15 @@ public class TaggingUtils {
 		case "setpoint":
 		case "statecontrol":
 		case "statefeedback":
-			if (p.getParent() instanceof Actor || p.getParent() instanceof TargetRange)
+			final Resource parent = p.getParent();
+			if (parent instanceof Actor || parent instanceof TargetRange) {
 				addProperty(result, LogDataTaggingConstants.DATA_TYPE, "setpoint");
+				// see org.ogema.model.sensors.Sensor
+				if (name.equals("statefeedback") || (name.equals("setpoint") && parent.getName().equals("deviceFeedback")))
+					addProperty(result, LogDataTaggingConstants.SETPOINT_TYPE, "deviceFeedback");
+				else if (name.equals("statecontrol") || (name.equals("setpoint") && parent.getName().equals("settings")))
+					addProperty(result, LogDataTaggingConstants.SETPOINT_TYPE, "managementSetting");
+			}
 		default:
 			return;
 		}

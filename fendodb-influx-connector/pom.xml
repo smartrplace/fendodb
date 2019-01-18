@@ -40,6 +40,7 @@
                 			!org.conscrypt,
                 			*
                 		</Import-Package>
+                		<Export-Package></Export-Package>
                 		<!-- requires executor service -->
                 		<Require-Capability>
                 			exec.housekeeping; filter:="(&amp;(version&gt;=1.0)(!(version&gt;=2.0)))"
