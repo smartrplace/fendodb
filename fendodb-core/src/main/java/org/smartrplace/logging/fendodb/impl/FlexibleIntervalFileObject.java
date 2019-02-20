@@ -304,6 +304,7 @@ public class FlexibleIntervalFileObject extends FileObject {
 			}
 			bb.get();
 		}
+		
 		return cnt;
 	}
 

@@ -712,8 +712,9 @@ public final class FileObjectProxy {
 	
 	// requires folder read lock 
 	private List<FileObjectList> getFoldersForIntervalSorted(final String label, final long start, final long end) throws IOException {
+		final long foldersStart = start == Long.MIN_VALUE ? start : TimeUtils.getCurrentStart(start, unit);
 		return days.stream()
-			.filter(day -> isFolderBetweenStartAndEnd(day, start, end, useCompatibilityMode)) // FIXME does not consider folder length!
+			.filter(day -> isFolderBetweenStartAndEnd(day, foldersStart, end, useCompatibilityMode))
 			.map(day -> day.resolve(label))
 			.filter(subfolder -> Files.isDirectory(subfolder))
 			.sorted(getParentDirComparator())
@@ -978,8 +979,7 @@ public final class FileObjectProxy {
 	 * @return
 	 * @throws IOException
 	 */
-	private static final boolean isFolderBetweenStartAndEnd(final Path name, final long start, final long end, 
-			final boolean useCompatibilityMode) {
+	private static final boolean isFolderBetweenStartAndEnd(final Path name, final long start, final long end, final boolean useCompatibilityMode) {
 		final long folderStart;
 		final String folderName = name.getFileName().toString();
 		try {
