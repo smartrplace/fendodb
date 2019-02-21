@@ -532,6 +532,13 @@ public class SlotsDb implements CloseableDataRecorder {
 		return proxy;
 	}
 
+	static FendoDbConfiguration readConfigForDbBasePath(final Path dbPath) throws IOException {
+		return readConfig(dbPath.resolve(CONFIG_PERSISTENCE_FILE));
+	}
+	
+	static void persistConfigForBasePath(final Path dbPath, final FendoDbConfiguration config) {
+		persistConfig(dbPath.resolve(CONFIG_PERSISTENCE_FILE), config);
+	}
 
 	private final static FendoDbConfiguration readConfig(final Path path) throws IOException {
 		if (!Files.exists(path))

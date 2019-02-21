@@ -879,11 +879,7 @@ public class FendoDbOverviewPage implements LazyWidgetPage {
 					setText("", req);
 					return;
 				}
-				try (final CloseableDataRecorder slots = instance.getDataRecorder()) {
-					setText(getValue(slots.getConfiguration()), req);
-				} catch (IOException e) {
-					setText("", req);
-				}
+				setText(getValue(instance.getConfiguration()), req);
 			}
 	
 			abstract String getValue(final FendoDbConfiguration config);

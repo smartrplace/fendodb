@@ -24,6 +24,9 @@ import org.osgi.service.metatype.annotations.ObjectClassDefinition;
 public @interface FendoInitConfig {
 	
 	String path();
+	
+	boolean constructEagerly() default false;
+	
 	boolean readOnly() default false;
 	boolean useCompatibilityMode() default false;
 	boolean parseFoldersOnInit() default false;

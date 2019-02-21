@@ -73,18 +73,22 @@ public class FendoInitImpl {
 				return;
 			}
 			try {
+				final FendoDbConfiguration cfg = FendoDbConfigurationBuilder.getInstance()
+						.setUseCompatibilityMode(config.useCompatibilityMode())
+						.setMaxOpenFolders(config.maxOpenFolders())
+						.setFlushPeriod(config.flushPeriod())
+						.setDataLifetimeInDays(config.dataLifeTimeDays())
+						.setDataExpirationCheckInterval(config.dataExpirationCheckInterval())
+						.setReadOnlyMode(config.readOnly())
+						.setMaxDatabaseSize(config.dataLimitSize())
+						.setParseFoldersOnInit(config.parseFoldersOnInit())
+						.build();
+				if (!config.constructEagerly()) {
+					((SlotsDbFactoryImpl) factory).addClosedInstance(path, cfg);
+					return;
+				}
 				CloseableDataRecorder instance = factory.getExistingInstance(path);
 				if (instance == null) {
-					final FendoDbConfiguration cfg = FendoDbConfigurationBuilder.getInstance()
-							.setUseCompatibilityMode(config.useCompatibilityMode())
-							.setMaxOpenFolders(config.maxOpenFolders())
-							.setFlushPeriod(config.flushPeriod())
-							.setDataLifetimeInDays(config.dataLifeTimeDays())
-							.setDataExpirationCheckInterval(config.dataExpirationCheckInterval())
-							.setReadOnlyMode(config.readOnly())
-							.setMaxDatabaseSize(config.dataLimitSize())
-							.setParseFoldersOnInit(config.parseFoldersOnInit())
-							.build();
 					instance = factory.getInstance(path, cfg);
 				}
 				this.instance = instance;

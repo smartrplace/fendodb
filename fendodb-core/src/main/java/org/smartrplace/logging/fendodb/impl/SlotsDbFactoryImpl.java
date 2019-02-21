@@ -72,10 +72,10 @@ public class SlotsDbFactoryImpl implements FendoDbFactory {
 	// Map<Path relative to rundir, database>
 	// synchronized on itself
 	private final Map<Path,SlotsDb> instances = new ConcurrentHashMap<>(4);
-	// also synchronized on instances
-	private final Map<Path, SlotsDb> pendingInstances = new HashMap<>(4);
 	// closed but existent instances; modifications synchronized on instances
 	private final List<Path> closedInstances = new CopyOnWriteArrayList<>();
+	// also synchronized on instances
+	private final Map<Path, SlotsDb> pendingInstances = new HashMap<>(4);
 	private final static Path BASE = Paths.get(".");
 	private final List<SlotsDbListener> listeners = new CopyOnWriteArrayList<>();
 	private volatile ServiceRegistration<?> shellCommands;
@@ -273,6 +273,25 @@ public class SlotsDbFactoryImpl implements FendoDbFactory {
 		}
 
 	};
+	
+	FendoDbReference addClosedInstance(final Path baseFolder, final FendoDbConfiguration config) throws IOException {
+		synchronized (instances) {
+			final SlotsDb db = getSlotsDb(baseFolder);
+			if (db != null)
+				return new FendoDbReference(db, isSecure);
+			final FendoDbConfiguration existingConfig = SlotsDb.readConfigForDbBasePath(baseFolder);
+			final FendoDbConfiguration finalConfig;
+			if (existingConfig == null) {
+				finalConfig = config;
+				Files.createDirectories(baseFolder);
+				SlotsDb.persistConfigForBasePath(baseFolder, config);
+			} else 
+				finalConfig = existingConfig;
+			if (!closedInstances.contains(baseFolder))
+				closedInstances.add(baseFolder);
+			return new FendoDbReference(baseFolder, finalConfig, this, isSecure);
+		}
+	}
 
 	@Override
 	public CloseableDataRecorder getInstance(Path baseFolder) throws IOException {
@@ -413,10 +432,13 @@ public class SlotsDbFactoryImpl implements FendoDbFactory {
 						if (isSecure && !PermissionUtils.mayRead(closed, accessManager))
 							continue;
 						try {
+							map.put(closed, new FendoDbReference(closed, SlotsDb.readConfigForDbBasePath(closed), this, isSecure));
+							/*
 							final SlotsDb slotsDb = new SlotsDb(closed, clock, null, this);
 							instances.put(closed, slotsDb);
 							map.put(closed, new FendoDbReference(slotsDb, isSecure));
 							closedInstances.remove(closed);
+							*/
 						} catch (IOException ignore) {
 						}
 					}

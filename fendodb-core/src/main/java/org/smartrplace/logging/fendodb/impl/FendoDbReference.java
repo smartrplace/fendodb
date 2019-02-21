@@ -23,6 +23,7 @@ import java.util.Objects;
 import org.smartrplace.logging.fendodb.CloseableDataRecorder;
 import org.smartrplace.logging.fendodb.DataRecorderReference;
 import org.smartrplace.logging.fendodb.FendoDbConfiguration;
+import org.smartrplace.logging.fendodb.FendoDbFactory;
 import org.smartrplace.logging.fendodb.accesscontrol.FendoDbAccessControl;
 
 // FIXME we should not need to create the instance just to get a reference!
@@ -30,26 +31,44 @@ class FendoDbReference implements DataRecorderReference {
 
 	private volatile SlotsDb master;
 	private final boolean isSecure;
+	private final Path path;
+	private final FendoDbConfiguration config;
+	private final FendoDbFactory factory;
 
 	FendoDbReference(SlotsDb master, boolean isSecure) {
 		this.master = Objects.requireNonNull(master);
 		this.isSecure = isSecure;
 		master.proxyCount.referenceAdded();
+		this.path = master.getPath();
+		this.config = master.getConfiguration();
+		this.factory = master.getFactory();
+	}
+
+	FendoDbReference(Path path, FendoDbConfiguration config, FendoDbFactory factory, boolean isSecure) {
+		this.master = null;
+		this.isSecure = isSecure;
+		this.path = path;
+		this.config = config;
+		this.factory = factory;
 	}
 
 	@Override
 	protected void finalize() throws Throwable {
-		master.proxyCount.referenceRemoved();
+		if (master != null)
+			master.proxyCount.referenceRemoved();
 	}
 
 	@Override
 	public Path getPath() {
-		return master.getPath();
+		return path;
 	}
 
+	/**
+	 * May be null!
+	 */
 	@Override
 	public FendoDbConfiguration getConfiguration() {
-		return master.getConfiguration();
+		return config;
 	}
 
 	@Override
@@ -60,11 +79,10 @@ class FendoDbReference implements DataRecorderReference {
 	@Override
 	public CloseableDataRecorder getDataRecorder(final FendoDbConfiguration configuration) throws IOException {
 		boolean cfgReadOnly = (configuration != null && configuration.isReadOnlyMode())
-				|| (configuration == null && master.getConfiguration().isReadOnlyMode());
+				|| (configuration == null && this.config.isReadOnlyMode());
 		if (!cfgReadOnly && this.isSecure) {
-			final SlotsDbFactoryImpl factory = master.getFactory();
-			final FendoDbAccessControl accessControl = factory == null ? null : factory.accessManager;
-			cfgReadOnly = !PermissionUtils.mayWrite(master.getPath(), accessControl);
+			final FendoDbAccessControl accessControl = factory == null ? null : ((SlotsDbFactoryImpl) factory).accessManager;
+			cfgReadOnly = !PermissionUtils.mayWrite(path, accessControl);
 			if (cfgReadOnly && configuration != null && !configuration.isReadOnlyMode())
 				throw new AccessControlException("Write access to database not permitted");
 		}
@@ -80,7 +98,7 @@ class FendoDbReference implements DataRecorderReference {
 
 	@Override
 	public String toString() {
-		return "FendoDbReference for [" + master.toString() + "]";
+		return "FendoDbReference for [" + (master != null ? master.toString() : path) + "]";
 	}
 
 	private SlotsDb checkState() throws IOException {
@@ -89,7 +107,7 @@ class FendoDbReference implements DataRecorderReference {
 			return initial;
 		synchronized (this) {
 			if (master == null || !master.isActive()) {
-				master = master.getFactory().getExistingInstanceInternal(master.getPath());
+				master = ((SlotsDbFactoryImpl) factory).getExistingInstanceInternal(path);
 				if (master != null) 
 					master.proxyCount.referenceAdded();
 			}
