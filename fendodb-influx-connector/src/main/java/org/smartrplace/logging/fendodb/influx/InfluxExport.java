@@ -17,6 +17,7 @@ package org.smartrplace.logging.fendodb.influx;
 
 import java.io.IOException;
 import java.lang.reflect.Field;
+import java.lang.reflect.Proxy;
 import java.nio.file.InvalidPathException;
 import java.nio.file.Paths;
 import java.time.DateTimeException;
@@ -30,16 +31,21 @@ import java.time.format.DateTimeFormatterBuilder;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Date;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
+import org.apache.felix.service.command.Descriptor;
 import org.influxdb.InfluxDB;
 import org.influxdb.InfluxDBException;
 import org.influxdb.InfluxDBFactory;
@@ -53,7 +59,6 @@ import org.ogema.core.channelmanager.measurements.SampledValue;
 import org.ogema.tools.timeseries.iterator.api.MultiTimeSeriesIterator;
 import org.ogema.tools.timeseries.iterator.api.MultiTimeSeriesIteratorBuilder;
 import org.ogema.tools.timeseries.iterator.api.SampledValueDataPoint;
-import org.osgi.service.component.ComponentException;
 import org.osgi.service.component.ComponentServiceObjects;
 import org.osgi.service.component.annotations.Activate;
 import org.osgi.service.component.annotations.Component;
@@ -76,6 +81,8 @@ import org.smartrplace.logging.fendodb.tagging.api.LogDataTaggingConstants;
 		configurationPolicy = ConfigurationPolicy.REQUIRE,
 		// default properties, can be overwritten via config properties
 		property = {
+				"osgi.command.scope=fendodb",
+				"osgi.command.function=influxExport",
 				"org.smartrplace.tools.housekeeping.Period:Long=6",
 				"org.smartrplace.tools.housekeeping.Delay:Long=6",
 				"org.smartrplace.tools.housekeeping.Unit=HOURS",
@@ -155,6 +162,48 @@ public class InfluxExport implements Runnable {
 	private final CompletableFuture<InfluxDB> future = new CompletableFuture<>();
 	private final Logger logger = LoggerFactory.getLogger(getClass());
 	
+	@SuppressWarnings("unchecked")
+	@Descriptor("For manually trigger exporting timeseries to InfluxDB")
+	public CompletionStage<Long> influxExport(
+			@Descriptor("Directory path where the data is stored (e.g. _16099/slotsdb") String referencePath,
+			@Descriptor("Starttime of the wanted time interval: Format YYYY-MM-ddTHH:mm:ss (or just YYYY-MM-dd)") final String startInterval,
+			@Descriptor("Endtime of the wanted time interval: Format YYYY-MM-ddTHH:mm:ss (or just YYYY-MM-dd)") final String endInterval) {
+		System.out.println("Uploading FendoDb data to InfluxDb for " + referencePath);
+		final ExecutorService exec = Executors.newSingleThreadExecutor();
+		final CompletableFuture<Long> result = CompletableFuture.supplyAsync(() -> {
+			final long startT = parseTimestamp(startInterval);
+			final long endT = parseTimestamp(endInterval);
+			final String path = config.fendodb();
+			final FendoDbFactory factory = fendoFactory.getService();
+			try {
+				final String prefix = path.contains("*") ? path.substring(0, path.indexOf('*')) : path;
+				return factory.getAllInstances().entrySet().stream()
+					.filter(entry -> entry.getKey().toString().replace('\\', '/').startsWith(prefix))
+					.map(Map.Entry::getValue)
+					.filter(reference -> reference.getPath().endsWith(referencePath)) // referencePath is something like "_16006/slotsdb"
+					.mapToLong(reference -> upload(reference, startT, endT))
+					.sum();
+			} finally {
+				fendoFactory.ungetService(factory);
+			}
+		}, exec);
+		result.whenCompleteAsync((r,exc) -> exec.shutdown());
+		result.whenCompleteAsync((r,e) -> {
+			if (e != null) {
+				System.out.println("Failed to upload to InfluxDB");
+				e.printStackTrace(System.out);
+			} else {
+				System.out.println("Upload to InfluxDB completed for " + referencePath+ ", nr values: " +  r);
+			}
+		});
+		// we cannot return the CompletableFuture object, because then gogo will call its #get method
+		// when trying to display the object
+		return (CompletionStage<Long>) Proxy.newProxyInstance(CompletionStage.class.getClassLoader(),
+                new Class<?>[] { CompletionStage.class },
+                (proxy, method, args) -> method.invoke(result, args));
+
+	}
+	
 	@Activate
 	protected void activate(InfluxConfig config) throws InterruptedException {
 		this.config = config;
@@ -186,34 +235,35 @@ public class InfluxExport implements Runnable {
 				factory.getAllInstances().entrySet().stream()
 					.filter(entry -> entry.getKey().toString().replace('\\', '/').startsWith(prefix))
 					.map(Map.Entry::getValue)
-					.forEach(reference -> {
-						logger.debug("Starting upload for FendoDb {}", reference.getPath());
-						try {
-							final FendoDbConfiguration config = FendoDbConfigurationBuilder.getInstance(reference.getConfiguration())
-								.setReadOnlyMode(true)
-								.build();
-							final long size = transfer(reference.getDataRecorder(config), getMeasurementId(reference));
-							logger.info("Uploaded {} data points for FendoDb {}", size, reference.getPath());
-						} catch (Exception e) {
-							logger.warn("Failed to transfer FendoDb data",e);
-						}	
-					});
+					.forEach(reference -> upload(reference, null, null));
 			} else {
 				try {
-					final CloseableDataRecorder instance = factory.getExistingInstance(Paths.get(config.fendodb()));
+					final CloseableDataRecorder instance = factory.getExistingInstance(Paths.get(path));
 					if ( instance == null) {
-						logger.warn("Configured FendoDb instance does not exist: {}", config.fendodb());
+						logger.warn("Configured FendoDb instance does not exist: {}", path);
 						return;
 					}
-					final long size = transfer(instance, null);
-					logger.info("Uploaded {} data points.", size);
+					transfer(instance, null, null, null);
 				} catch (IOException | InvalidPathException e) {
-					logger.warn("Failed to transfer FendoDb data",e);
+					logger.warn("Failed to transfer FendoDb data", e);
 				}
 			}
 		} finally {
 			fendoFactory.ungetService(factory);
 		}
+	}
+	
+	private long upload(DataRecorderReference reference, final Long startT, final Long endT) {
+		
+		try {
+			final FendoDbConfiguration config = FendoDbConfigurationBuilder.getInstance(reference.getConfiguration())
+					.setReadOnlyMode(true)
+					.build();
+			return transfer(reference.getDataRecorder(config), getMeasurementId(reference), startT, endT);
+		} catch (Exception e) {
+			logger.warn("Failed to transfer FendoDb data", e);
+			return 0;
+		}	
 	}
 	
 	private void createDb(final InfluxDB influx) {
@@ -254,28 +304,36 @@ public class InfluxExport implements Runnable {
 		return success;
 	}
 	
-	private long transfer(final CloseableDataRecorder fendo, final String instance) {
+	// transfer delivers the size of all datapoints uploaded for one instance (e.g. gw)
+	private long transfer(final CloseableDataRecorder fendo, final String instance, final Long startT, final Long endT) {
+		// fendo.getAllTimeResources = 
 		final List<FendoTimeSeries> ts = fendo.getAllTimeSeries();
 //		final Map<String, List<FendoTimeSeries>> tsByTags = ts.stream()
 //			.collect(Collectors.groupingBy(InfluxExport::getTagsAsString));
 //		return tsByTags.values().stream().mapToLong(tag -> transfer(tag, fendo.getPath().toString().replace('\\', '/'))) // TODO do we need to replace any characters?
 //			.sum();
 		return ts.stream()
-			.mapToLong(t -> transfer(Collections.singletonList(t), instance))
+			.mapToLong(t -> transfer(Collections.singletonList(t), instance, startT, endT))
 			.sum();
 	}	
 	
-	private long transfer(final List<FendoTimeSeries> timeSeries, final String instance) {
+	// transfer delivers the size of all datapoints uploaded for one resource of one instance (e.g. gw)
+	private long transfer(final List<FendoTimeSeries> timeSeries, final String instance, final Long startT, final Long endT) {
+		
 		final String measId0 = config.measurementid();
 		final String measurementId = instance != null && measId0.isEmpty() ? instance : instance != null ? measId0 + "_" + instance : measId0;
+		
 		long max = timeSeries.stream()
 			.mapToLong(ts -> getLastTimestamp(ts, measurementId))
 			.max().orElse(Long.MIN_VALUE);
+		
 		final BatchPoints.Builder builder = BatchPoints.database(config.influxdb())
 				.precision(TimeUnit.MILLISECONDS);
 		// Influx DB supports a single tag value only
+		
 		timeSeries.iterator().next().getProperties().entrySet().stream()
 			.forEach(entry -> builder.tag(entry.getKey(), entry.getValue().iterator().next()));
+
 		final List<String> fieldIds = timeSeries.stream()
 				.map(FendoTimeSeries::getProperties)
 				.map(InfluxExport::getFieldNameFromProperties)
@@ -285,6 +343,12 @@ public class InfluxExport implements Runnable {
 		try {
 			final Field timeField = Point.class.getDeclaredField("time");
 			timeField.setAccessible(true);
+			
+			if(startT != null && endT != null) {
+				startTime = startT.longValue();
+				endTime = endT.longValue();
+			}
+			
 			while (true) {
 				if (max == Long.MAX_VALUE)
 					break;
@@ -292,7 +356,7 @@ public class InfluxExport implements Runnable {
 				if (start > endTime)
 					break;
 				final List<Point> points;
-				if (timeSeries.size() == 1) 
+				if (timeSeries.size() == 1)
 					points = getPoints(timeSeries.get(0).getPath(), timeSeries.get(0).iterator(start, endTime), measurementId, fieldIds.get(0));
 				else {
 					final MultiTimeSeriesIterator it = 
@@ -311,7 +375,7 @@ public class InfluxExport implements Runnable {
 				} catch (InfluxDBException exc) { // typically the
 					if (failureCnt++ == 0) // retry once
 						continue;
-					logger.error("Failed to write timeseries {} in db {}. Nr points: {}", timeSeries, instance, points.size(), exc);
+					logger.error("Failed to write all data of timeseries {} from {} after the second try. Amount of data points: {}", timeSeries.get(0).getPath(), instance, points.size(), exc);
 					break;
 				}
 				failureCnt = 0;
@@ -319,6 +383,10 @@ public class InfluxExport implements Runnable {
 				// max = arr[arr.length-1].time
 				max = ((Long) timeField.get(arr[arr.length-1])).longValue();
 			}
+			
+			logger.debug("Exported {} datapoints for timeseries {} from {} to {}", size, timeSeries.get(0).getPath(), 
+					startT == null ? null : new Date(startT), endT == null ? null : new Date(endT));
+			
 		} catch (IllegalAccessException | NoSuchFieldException | SecurityException e) {
 			throw new RuntimeException(e);
 		}
@@ -354,6 +422,7 @@ public class InfluxExport implements Runnable {
 		if (i == cols.size())
 			return Long.MIN_VALUE;
 		final String time = (String) series.getValues().iterator().next().get(i);
+
 		return ZonedDateTime.from(DateTimeFormatter.ISO_DATE_TIME.parse(time)).toInstant().toEpochMilli();
 	}
 	
@@ -396,7 +465,7 @@ public class InfluxExport implements Runnable {
 	private static List<Point> getPoints(final String path, final Iterator<SampledValue> it, final String measurementId, final String fieldId) {
 		final List<Point> points = new ArrayList<>();
 		int cnt = 0;
-		while(it.hasNext() && cnt <= 1000) {
+		while(it.hasNext() && cnt <= 500) {
 			final SampledValue sv = it.next();
 			final Point point = Point.measurement(measurementId)
 					.time(sv.getTimestamp(), TimeUnit.MILLISECONDS)
@@ -450,7 +519,7 @@ public class InfluxExport implements Runnable {
 		return s0;
 	}
 	
-	private static Long parseTimestamp(final String in) {
+	private static long parseTimestamp(final String in) {
 		try {
 			return Long.parseLong(in);
 		} catch (NumberFormatException expected) {}
@@ -465,7 +534,7 @@ public class InfluxExport implements Runnable {
 			return ZonedDateTime.of(LocalDateTime.of(LocalDate.from(DEFAULT_FORMATTER_PARSE_NO_ZONE.parse(in)), LocalTime.MIN), ZoneId.systemDefault()).toInstant().toEpochMilli();
 		} catch (DateTimeException expected) {
 		}
-		throw new ComponentException("Unsupported time format " + in);
+		throw new RuntimeException("Unsupported time format " + in);
 	}
 	
 }
