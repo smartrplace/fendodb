@@ -239,7 +239,7 @@ public class InfluxExport implements Runnable {
 			} else {
 				try {
 					final CloseableDataRecorder instance = factory.getExistingInstance(Paths.get(path));
-					if ( instance == null) {
+					if (instance == null) {
 						logger.warn("Configured FendoDb instance does not exist: {}", path);
 						return;
 					}
@@ -312,9 +312,17 @@ public class InfluxExport implements Runnable {
 //			.collect(Collectors.groupingBy(InfluxExport::getTagsAsString));
 //		return tsByTags.values().stream().mapToLong(tag -> transfer(tag, fendo.getPath().toString().replace('\\', '/'))) // TODO do we need to replace any characters?
 //			.sum();
-		return ts.stream()
-			.mapToLong(t -> transfer(Collections.singletonList(t), instance, startT, endT))
-			.sum();
+		long sum = 0;
+		for (FendoTimeSeries t : ts) {
+			if (Thread.interrupted()) {
+				try {
+					Thread.currentThread().interrupt();
+				} catch (SecurityException ignore) {}
+				break;
+			}
+			sum += transfer(Collections.singletonList(t), instance, startT, endT);
+		}
+		return sum;
 	}	
 	
 	// transfer delivers the size of all datapoints uploaded for one resource of one instance (e.g. gw)
@@ -350,6 +358,12 @@ public class InfluxExport implements Runnable {
 			}
 			
 			while (true) {
+				if (Thread.interrupted()) {
+					try {
+						Thread.currentThread().interrupt();
+					} catch (SecurityException ignore) {}
+					break;
+				}
 				if (max == Long.MAX_VALUE)
 					break;
 				final long start = Math.max(max + 1, startTime);
