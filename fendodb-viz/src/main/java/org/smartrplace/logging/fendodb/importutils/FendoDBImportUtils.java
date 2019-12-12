@@ -7,6 +7,7 @@ import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.text.NumberFormat;
 import java.text.ParseException;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -53,21 +54,27 @@ public class FendoDBImportUtils {
      * ogema.tools could be used for this, probably extensions for the formats
      * are required
      */
-    public static void importCSVData(FendoTimeSeries fts,
+    public static String importCSVData(FendoTimeSeries fts,
             ImportFormat inputFormat, FileItem fileItem) {
+        String msg = "OK";
         switch (inputFormat) {
             case EMONCMS : {
                 try {
                 List<SampledValue> values = readEmonCmsCSV(fileItem.getInputStream());
                 LOGGER.info("inserting {} values from CSV import into {}", values.size(), fts.getPath());
                 fts.insertValues(values);
+                msg = String.format("%d values inserted into time series %s", values.size(), fts.getPath());
                 } catch (IOException | DataRecorderException ex) {
                     LOGGER.error("CVS import failed", ex);
+                    msg = String.format("ERROR: CSV import failed (%s)", ex.getMessage());
                 }
                 break;
             }
-            default : {}
+            default : {
+                LOGGER.warn("ERROR: unsupported file format selected for CSV import: {}", inputFormat);
+            }
         }
+        return msg;
     }
 
     public static List<SampledValue> readEmonCmsCSV(InputStream is) {
@@ -88,12 +95,19 @@ public class FendoDBImportUtils {
                 }
                 try {
                     long timestamp = Long.parseLong(a[0]);
+                    timestamp *= 1000; // UNIX timestamps
                     float value = nf.parse(a[1]).floatValue();
                     rval.add(new SampledValue(new FloatValue(value), timestamp, Quality.GOOD));
                     count++;
                 } catch (ParseException | NumberFormatException e) {
                     LOGGER.warn("unparseable line in CVS input: {}", line, e);
                 }
+            }
+            if (!rval.isEmpty()) {
+                LOGGER.info("read {} values, start={}, end={}", rval.size(),
+                        Instant.ofEpochMilli(rval.get(0).getTimestamp()),
+                        Instant.ofEpochMilli(rval.get(rval.size()-1).getTimestamp())
+                        );
             }
         } catch (IOException ioex) {
             LOGGER.error("import failed", ioex);

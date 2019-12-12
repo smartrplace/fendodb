@@ -153,7 +153,7 @@ public class CsvExportPage implements LazyWidgetPage {
 	
 				private final void initScheduleViewer(final OgemaHttpRequest req) {
 					seriesSelector.update(Collections.emptyList(), req);
-					try (final CloseableDataRecorder rec = Utils.getDataRecorder(slotsSelector, req, true)) {
+					try (final CloseableDataRecorder rec = Utils.getDataRecorder(slotsSelector, req, false)) {
 						if (rec == null)
 							return;
 						//FIXME: Quick hack to avoid too many time series offered here

@@ -106,8 +106,9 @@ public class CsvImportPage implements LazyWidgetPage {
 
 				@Override
 				public void fileUploaded(FileItem fileItem, UploadData context, OgemaHttpRequest req) {
-					FendoDBImportUtils.importCSVData(
+					String msg = FendoDBImportUtils.importCSVData(
 							context.ts, context.format, fileItem);
+                                        alert.showAlert(msg, !msg.contains("ERROR"), req);
 				}
 				
 			};
