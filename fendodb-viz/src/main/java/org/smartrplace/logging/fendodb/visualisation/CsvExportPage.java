@@ -16,7 +16,6 @@
 package org.smartrplace.logging.fendodb.visualisation;
 
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
@@ -38,6 +37,7 @@ import org.smartrplace.logging.fendodb.DataRecorderReference;
 import org.smartrplace.logging.fendodb.FendoDbFactory;
 import org.smartrplace.logging.fendodb.FendoTimeSeries;
 import org.smartrplace.logging.fendodb.search.SearchFilterBuilder;
+import org.smartrplace.logging.fendodb.search.TimeSeriesMatcher;
 import org.smartrplace.logging.fendodb.tools.FendoDbTools;
 import org.smartrplace.logging.fendodb.tools.dump.DumpConfiguration;
 import org.smartrplace.logging.fendodb.tools.dump.DumpConfigurationBuilder;
@@ -64,6 +64,7 @@ import de.iwes.widgets.html.form.dropdown.EnumDropdown;
 import de.iwes.widgets.html.form.dropdown.TemplateDropdown;
 import de.iwes.widgets.html.form.label.Header;
 import de.iwes.widgets.html.form.label.Label;
+import de.iwes.widgets.html.form.textfield.TextField;
 import de.iwes.widgets.html.form.textfield.ValueInputField;
 import de.iwes.widgets.html.html5.Flexbox;
 import de.iwes.widgets.html.html5.SimpleGrid;
@@ -71,6 +72,7 @@ import de.iwes.widgets.html.html5.flexbox.JustifyContent;
 import de.iwes.widgets.html.multiselect.Multiselect;
 import de.iwes.widgets.html.multiselect.TemplateMultiselect;
 import de.iwes.widgets.reswidget.scheduleviewer.StartEndDatepicker;
+import de.iwes.widgets.template.DefaultDisplayTemplate;
 import de.iwes.widgets.template.DisplayTemplate;
 
 @Component(
@@ -86,9 +88,16 @@ public class CsvExportPage implements LazyWidgetPage {
 	@Reference
 	private FendoDbFactory factory;
 	
+	public static enum SelectionMode {
+		TAGS_PROPERTIES,
+		PATH,
+		FILTER
+	}
+
 	@Override
 	public void init(ApplicationManager appMan, WidgetPage<?> page) {
-		new CsvExportPageInit(page, factory, appMan, false, "_export");
+		new CsvExportPageInit(page, factory, appMan, false, "_export",
+				SelectionMode.TAGS_PROPERTIES, true);
 	}
 	
 	static class CsvExportPageInit {
@@ -97,20 +106,17 @@ public class CsvExportPage implements LazyWidgetPage {
 		protected Header header = null;
 		protected final Alert alert;
 		
-		protected static enum SelectionMode {
-			TAGS_PROPERTIES,
-			PATH,
-			FILTER
-		}
-		//protected final TemplateDropdown<SelectionMode> selectionMode;
+		public SelectionMode defaultSelectionMode;
+		protected final TemplateDropdown<SelectionMode> selectionMode;
+		protected final TextField filterString;
 		
 		protected final FendoSelector slotsSelector;
 		protected final Multiselect tagsSelect;
 		protected final PropertiesFlexbox propertiesBox;
 		protected final Button applySelection;
 		protected final TemplateMultiselect<FendoTimeSeries> seriesSelector;
-		protected final Datepicker startPicker;
-		protected final Datepicker endPicker;
+		protected Datepicker startPicker = null;
+		protected Datepicker endPicker = null;
 		protected final Checkbox2 options;
 		private ValueInputField<Long> samplingInterval = null;
 		private EnumDropdown<TimeUnit> samplingUnitSelector = null;
@@ -121,14 +127,18 @@ public class CsvExportPage implements LazyWidgetPage {
 		private static final String SINGLE_FILE_PROP = "singlefile";
 		private static final String DATES_FIXED_PROP = "datesfixed";
 		private static final String ALIGN_TIMESTAMPS_PROP = "aligntimestamps";
-	
+		protected final boolean showTimePickers;
+		
 		protected final String subId;
 		
 		@SuppressWarnings("serial")
 		CsvExportPageInit(final WidgetPage<?> page, final FendoDbFactory factory,
-				final ApplicationManager am, boolean isInherited, String subId) {
+				final ApplicationManager am, boolean isInherited, String subId, SelectionMode defaultSelectionModeIn,
+				boolean showTimePickers) {
 			this.page = page;
 			this.subId = subId;
+			this.showTimePickers = showTimePickers;
+			this.defaultSelectionMode = defaultSelectionModeIn;
 			if(!isInherited) {
 				page.setTitle("FendoDB CSV export");
 				this.header = new Header(page, "header"+subId, "CSV export");
@@ -156,26 +166,46 @@ public class CsvExportPage implements LazyWidgetPage {
 					try (final CloseableDataRecorder rec = Utils.getDataRecorder(slotsSelector, req, false)) {
 						if (rec == null)
 							return;
-						//FIXME: Quick hack to avoid too many time series offered here
-						List<FendoTimeSeries> allTs = rec.getAllTimeSeries();
-						List<FendoTimeSeries> offered = new ArrayList<>();
-						for(FendoTimeSeries ts: allTs) {
-							if(ts.getPath().contains("EMON_BASE/electricityConnectionBox_D/connection/energySensor"))
-								offered.add(ts);
-						}
-						seriesSelector.update(offered, req);
-						//seriesSelector.update(rec.getAllTimeSeries(), req);
+						seriesSelector.update(rec.getAllTimeSeries(), req);
 					} catch (IOException ignore) {}
 				}
 	
 			};
-			//this.selectionMode = new TemplateDropdown<>(page, "selectionMode");
-			//selectionMode.setDefaultItems(Arrays.asList(a));
+			this.selectionMode = new TemplateDropdown<SelectionMode>(page, "selectionMode") {
+				@Override
+				public void onPOSTComplete(String data, OgemaHttpRequest req) {
+					super.onPOSTComplete(data, req);
+					defaultSelectionMode = getSelectedItem(req);
+					selectDefaultItem(defaultSelectionMode);
+				}
+			};
+			selectionMode.setDefaultItems(Arrays.asList(new SelectionMode[] {SelectionMode.TAGS_PROPERTIES, SelectionMode.PATH, SelectionMode.FILTER}));
+			selectionMode.selectDefaultItem(defaultSelectionMode);
+			selectionMode.setTemplate(new DefaultDisplayTemplate<SelectionMode>() {
+				@Override
+				public String getLabel(SelectionMode object, OgemaLocale locale) {
+					switch(object) {
+					case TAGS_PROPERTIES:
+						return "Filter via FendoDB Tags and Properties";
+					case FILTER:
+						return "Filter all time series that have a given String in path";
+					case PATH:
+						return "Only offer time series for which path matches String exactly";
+					default:
+						throw new IllegalArgumentException("Unknown SelectionMode:"+object);
+					}
+				}
+			});
 			
 			this.tagsSelect = new Multiselect(page, "tagsSelect"+subId) {
 	
 				@Override
 				public void onGET(OgemaHttpRequest req) {
+					if(selectionMode.getSelectedItem(req) != SelectionMode.TAGS_PROPERTIES) {
+						setWidgetVisibility(false, req);
+						return;
+					}
+					setWidgetVisibility(true, req);
 					clear(req);
 					Map<String, Collection<String>> props = Collections.emptyMap();
 					try (final CloseableDataRecorder rec = Utils.getDataRecorder(slotsSelector, req, true)) {
@@ -193,7 +223,30 @@ public class CsvExportPage implements LazyWidgetPage {
 				}
 	
 			};
-			this.propertiesBox = new PropertiesFlexbox(page, "propertiesBox"+subId);
+			this.propertiesBox = new PropertiesFlexbox(page, "propertiesBox"+subId) {
+				@Override
+				public void onGET(OgemaHttpRequest req) {
+					if(selectionMode.getSelectedItem(req) != SelectionMode.TAGS_PROPERTIES) {
+						setWidgetVisibility(false, req);
+						return;
+					}
+					setWidgetVisibility(true, req);
+					super.onGET(req);
+				}
+			};
+			
+			this.filterString = new TextField(page, "filterString") {
+				@Override
+				public void onGET(OgemaHttpRequest req) {
+					if(selectionMode.getSelectedItem(req) == SelectionMode.TAGS_PROPERTIES) {
+						setWidgetVisibility(false, req);
+						return;
+					}
+					setWidgetVisibility(true, req);
+					super.onGET(req);
+				}				
+			};
+			
 			this.applySelection = new Button(page, "applySelection"+subId, "Apply filters") {
 	
 				@Override
@@ -203,19 +256,41 @@ public class CsvExportPage implements LazyWidgetPage {
 						seriesSelector.update(Collections.emptyList(), req);
 						return;
 					}
-					final Map<String, Collection<String>> props = propertiesBox.getSelectedProperties(req);
-					final SearchFilterBuilder builder = SearchFilterBuilder.getInstance();
-					props.entrySet().stream()
-						.filter(entry -> !entry.getValue().isEmpty())
-						.forEach(entry -> builder.filterByPropertyMultiValue(entry.getKey(), entry.getValue(), false));
-	//					.forEach(entry -> entry.getValue().stream().forEach(val -> builder.filterByProperty(entry.getKey(), val, false)));
-					try (final CloseableDataRecorder rec = ref.getDataRecorder()) {
-						final List<FendoTimeSeries> result = rec.findTimeSeries(builder.build());
-						seriesSelector.update(result, req);
-						seriesSelector.selectItems(result, req);
-					} catch (IOException e) {
-						alert.showAlert("An error occured: " + e, false, req);
-						return;
+					SelectionMode selMode = selectionMode.getSelectedItem(req);
+					if(selMode == SelectionMode.TAGS_PROPERTIES) {
+						final Map<String, Collection<String>> props = propertiesBox.getSelectedProperties(req);
+						final SearchFilterBuilder builder = SearchFilterBuilder.getInstance();
+						props.entrySet().stream()
+							.filter(entry -> !entry.getValue().isEmpty())
+							.forEach(entry -> builder.filterByPropertyMultiValue(entry.getKey(), entry.getValue(), false));
+		//					.forEach(entry -> entry.getValue().stream().forEach(val -> builder.filterByProperty(entry.getKey(), val, false)));
+						try (final CloseableDataRecorder rec = ref.getDataRecorder()) {
+							final List<FendoTimeSeries> result = rec.findTimeSeries(builder.build());
+							seriesSelector.update(result, req);
+							seriesSelector.selectItems(result, req);
+						} catch (IOException e) {
+							alert.showAlert("An error occured: " + e, false, req);
+							return;
+						}
+					} else {
+						String path = filterString.getValue(req);
+						try (final CloseableDataRecorder rec = ref.getDataRecorder()) {
+							TimeSeriesMatcher matcher = new TimeSeriesMatcher() {
+								
+								@Override
+								public boolean matches(FendoTimeSeries arg0) {
+									if(selMode == SelectionMode.PATH) return arg0.getPath().equals(path);
+									return arg0.getPath().contains(path);
+								}
+							};
+							final List<FendoTimeSeries> result = rec.findTimeSeries(matcher );
+							seriesSelector.update(result, req);
+							seriesSelector.selectItems(result, req);
+						} catch (IOException e) {
+							alert.showAlert("An error occured: " + e, false, req);
+							return;
+						}
+						
 					}
 	
 				}
@@ -253,8 +328,9 @@ public class CsvExportPage implements LazyWidgetPage {
 						nrDatapoints.setText("0", req);
 						return;
 					}
-					final long start = startPicker.getDateLong(req);
-					long end = endPicker.getDateLong(req);
+					
+					final long start = showTimePickers?startPicker.getDateLong(req):0;
+					long end = showTimePickers?endPicker.getDateLong(req):Long.MAX_VALUE;
 					if (end < start) { // this might lead to an exception in the size call, otherwise
 						nrDatapoints.setText("0", req);
 						return;
@@ -276,8 +352,10 @@ public class CsvExportPage implements LazyWidgetPage {
 				}
 				
 			};
-			this.startPicker = new CsvStartEndPicker(page, "startPicker"+subId, true);
-			this.endPicker = new CsvStartEndPicker(page, "endPicker"+subId, false);
+			if(showTimePickers) {
+				this.startPicker = new CsvStartEndPicker(page, "startPicker"+subId, true);
+				this.endPicker = new CsvStartEndPicker(page, "endPicker"+subId, false);
+			}
 			
 			this.options = new Checkbox2(page, "optionsCheck"+subId) {
 				
@@ -392,9 +470,9 @@ public class CsvExportPage implements LazyWidgetPage {
 	
 		protected void buildPage() {
 			int row = 0;
-			page.append(header).append(alert).linebreak().append(new StaticTable(2, 3, new int[] {2,2,8})
-				.setContent(row, 0, "Select FendoDB").setContent(row++, 1, slotsSelector)
-				.setContent(row, 0, "Select tags").setContent(row++, 1, tagsSelect)
+			page.append(header).append(alert).linebreak().append(new StaticTable(2, 3, new int[] {2,2,2,6})
+				.setContent(row, 0, "Select FendoDB").setContent(row, 1, slotsSelector).setContent(row++, 2, selectionMode)
+				.setContent(row, 0, "Select tags").setContent(row, 1, tagsSelect).setContent(row++, 1, filterString)
 			).append(new StaticTable(2, 2, new int[] {2,10})
 				.setContent(row=0, 0, "Select properties").setContent(row++, 1, propertiesBox)
 				.setContent(row, 0, applySelection)
@@ -432,16 +510,18 @@ public class CsvExportPage implements LazyWidgetPage {
 				downloadTrigger.triggerAction(download, TriggeringAction.POST_REQUEST, FileDownloadData.GET_AND_STARTDOWNLOAD);
 				options.triggerAction(samplingInterval, TriggeringAction.POST_REQUEST, TriggeredAction.GET_REQUEST);
 				options.triggerAction(samplingUnitSelector, TriggeringAction.POST_REQUEST, TriggeredAction.GET_REQUEST);
+				seriesSelector.triggerAction(downloadTrigger, TriggeringAction.GET_REQUEST, TriggeredAction.GET_REQUEST);
+				seriesSelector.triggerAction(downloadTrigger, TriggeringAction.POST_REQUEST, TriggeredAction.GET_REQUEST);
 			}
 			options.triggerAction(nrDatapoints, TriggeringAction.POST_REQUEST, TriggeredAction.GET_REQUEST);
 			options.triggerAction(options, TriggeringAction.POST_REQUEST, TriggeredAction.GET_REQUEST);
 			
-			seriesSelector.triggerAction(startPicker, TriggeringAction.GET_REQUEST, TriggeredAction.GET_REQUEST);
-			seriesSelector.triggerAction(startPicker, TriggeringAction.POST_REQUEST, TriggeredAction.GET_REQUEST);
-			seriesSelector.triggerAction(endPicker, TriggeringAction.GET_REQUEST, TriggeredAction.GET_REQUEST);
-			seriesSelector.triggerAction(endPicker, TriggeringAction.POST_REQUEST, TriggeredAction.GET_REQUEST);
-			seriesSelector.triggerAction(downloadTrigger, TriggeringAction.GET_REQUEST, TriggeredAction.GET_REQUEST);
-			seriesSelector.triggerAction(downloadTrigger, TriggeringAction.POST_REQUEST, TriggeredAction.GET_REQUEST);
+			if(showTimePickers) {
+				seriesSelector.triggerAction(startPicker, TriggeringAction.GET_REQUEST, TriggeredAction.GET_REQUEST);
+				seriesSelector.triggerAction(startPicker, TriggeringAction.POST_REQUEST, TriggeredAction.GET_REQUEST);
+				seriesSelector.triggerAction(endPicker, TriggeringAction.GET_REQUEST, TriggeredAction.GET_REQUEST);
+				seriesSelector.triggerAction(endPicker, TriggeringAction.POST_REQUEST, TriggeredAction.GET_REQUEST);
+			}
 			seriesSelector.triggerAction(nrDatapoints, TriggeringAction.GET_REQUEST, TriggeredAction.GET_REQUEST);
 			seriesSelector.triggerAction(nrDatapoints, TriggeringAction.POST_REQUEST, TriggeredAction.GET_REQUEST);
 		}

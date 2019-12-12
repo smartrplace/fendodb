@@ -26,6 +26,7 @@ import org.smartrplace.logging.fendodb.FendoDbFactory;
 import org.smartrplace.logging.fendodb.FendoTimeSeries;
 import org.smartrplace.logging.fendodb.importutils.FendoDBImportUtils;
 import org.smartrplace.logging.fendodb.visualisation.CsvExportPage.CsvExportPageInit;
+import org.smartrplace.logging.fendodb.visualisation.CsvExportPage.SelectionMode;
 
 import de.iwes.widgets.api.extended.WidgetData;
 import de.iwes.widgets.api.widgets.LazyWidgetPage;
@@ -85,11 +86,12 @@ public class CsvImportPage implements LazyWidgetPage {
 		//private final ButtonConfirm deleteIntervalButton;
 		
 		CsvImportPageInit(WidgetPage<?> page, FendoDbFactory factory, ApplicationManager am) {
-			super(page, factory, am, true, "_import");
+			super(page, factory, am, true, "_import", SelectionMode.FILTER, false);
 			page.setTitle("FendoDB CSV import");
 			this.header = new Header(page, "header"+subId, "CSV import");
 			header.addDefaultStyle(WidgetData.TEXT_ALIGNMENT_LEFT);
 			header.setDefaultColor("red");
+			
 			formatDrop = new TemplateDropdown<ImportFormat>(page, "formatDrop");
 			formatDrop.setTemplate(new DefaultDisplayTemplate<ImportFormat>() {
 				@Override
@@ -172,9 +174,9 @@ public class CsvImportPage implements LazyWidgetPage {
 		@Override
 		protected void buildPage() {
 			int row = 0;
-			page.append(header).append(alert).linebreak().append(new StaticTable(2, 3, new int[] {2,2,8})
-				.setContent(row, 0, "Select FendoDB").setContent(row++, 1, slotsSelector)
-				.setContent(row, 0, "Select tags").setContent(row++, 1, tagsSelect)
+			page.append(header).append(alert).linebreak().append(new StaticTable(2, 4, new int[] {2,2,2,6})
+					.setContent(row, 0, "Select FendoDB").setContent(row, 1, slotsSelector).setContent(row++, 2, selectionMode)
+					.setContent(row, 0, "Select tags").setContent(row, 1, tagsSelect).setContent(row++, 1, filterString)
 			).append(new StaticTable(2, 2, new int[] {2,10})
 				.setContent(row=0, 0, "Select properties").setContent(row++, 1, propertiesBox)
 				.setContent(row, 0, applySelection)
@@ -183,8 +185,8 @@ public class CsvImportPage implements LazyWidgetPage {
 			
 			final SimpleGrid grid = new SimpleGrid(page, "mainGrid", true)
 					.addItem("Select timeseries", false, null).addItem(seriesSelector, false, null)
-					.addItem("Start time", true, null).addItem(startPicker, false, null)
-					.addItem("End time", true, null).addItem(endPicker, false, null)
+					//.addItem("Start time", true, null).addItem(startPicker, false, null)
+					//.addItem("End time", true, null).addItem(endPicker, false, null)
 					.addItem("CSV Format", true, null).addItem(formatDrop, false, null)
 					.addItem("Options", true, null).addItem(options, false, null)
 					.addItem("Sampling interval", true, null).addItem(samplingFlex, false, null)
