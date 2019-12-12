@@ -16,6 +16,7 @@
 package org.smartrplace.logging.fendodb.visualisation;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
@@ -146,7 +147,15 @@ public class CsvExportPage implements LazyWidgetPage {
 					try (final CloseableDataRecorder rec = Utils.getDataRecorder(slotsSelector, req, true)) {
 						if (rec == null)
 							return;
-						seriesSelector.update(rec.getAllTimeSeries(), req);
+						//FIXME: Quick hack to avoid too many time series offered here
+						List<FendoTimeSeries> allTs = rec.getAllTimeSeries();
+						List<FendoTimeSeries> offered = new ArrayList<>();
+						for(FendoTimeSeries ts: allTs) {
+							if(ts.getPath().contains("EMON_BASE/electricityConnectionBox_D/connection/energySensor"))
+								offered.add(ts);
+						}
+						seriesSelector.update(offered, req);
+						//seriesSelector.update(rec.getAllTimeSeries(), req);
 					} catch (IOException ignore) {}
 				}
 	
