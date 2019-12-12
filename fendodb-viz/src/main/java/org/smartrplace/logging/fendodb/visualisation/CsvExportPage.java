@@ -61,6 +61,7 @@ import de.iwes.widgets.html.form.checkbox.Checkbox2;
 import de.iwes.widgets.html.form.checkbox.DefaultCheckboxEntry;
 import de.iwes.widgets.html.form.dropdown.DropdownOption;
 import de.iwes.widgets.html.form.dropdown.EnumDropdown;
+import de.iwes.widgets.html.form.dropdown.TemplateDropdown;
 import de.iwes.widgets.html.form.label.Header;
 import de.iwes.widgets.html.form.label.Label;
 import de.iwes.widgets.html.form.textfield.ValueInputField;
@@ -95,6 +96,14 @@ public class CsvExportPage implements LazyWidgetPage {
 		protected final WidgetPage<?> page;
 		protected Header header = null;
 		protected final Alert alert;
+		
+		protected static enum SelectionMode {
+			TAGS_PROPERTIES,
+			PATH,
+			FILTER
+		}
+		//protected final TemplateDropdown<SelectionMode> selectionMode;
+		
 		protected final FendoSelector slotsSelector;
 		protected final Multiselect tagsSelect;
 		protected final PropertiesFlexbox propertiesBox;
@@ -160,6 +169,9 @@ public class CsvExportPage implements LazyWidgetPage {
 				}
 	
 			};
+			//this.selectionMode = new TemplateDropdown<>(page, "selectionMode");
+			//selectionMode.setDefaultItems(Arrays.asList(a));
+			
 			this.tagsSelect = new Multiselect(page, "tagsSelect"+subId) {
 	
 				@Override
