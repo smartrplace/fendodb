@@ -35,7 +35,6 @@ import de.iwes.widgets.api.widgets.dynamics.TriggeringAction;
 import de.iwes.widgets.api.widgets.html.StaticTable;
 import de.iwes.widgets.api.widgets.localisation.OgemaLocale;
 import de.iwes.widgets.api.widgets.sessionmanagement.OgemaHttpRequest;
-import de.iwes.widgets.html.buttonconfirm.ButtonConfirm;
 import de.iwes.widgets.html.fileupload.FileUpload;
 import de.iwes.widgets.html.fileupload.FileUploadListener;
 import de.iwes.widgets.html.form.button.Button;
@@ -83,7 +82,7 @@ public class CsvImportPage implements LazyWidgetPage {
 		private final TemplateDropdown<ImportFormat> formatDrop;
 		private final Button startImportButton;
 		private final FileUpload importUpload;
-		private final ButtonConfirm deleteIntervalButton;
+		//private final ButtonConfirm deleteIntervalButton;
 		
 		CsvImportPageInit(WidgetPage<?> page, FendoDbFactory factory, ApplicationManager am) {
 			super(page, factory, am, true, "_import");
@@ -137,7 +136,7 @@ public class CsvImportPage implements LazyWidgetPage {
 	    	startImportButton.triggerAction(importUpload, TriggeringAction.POST_REQUEST, TriggeredAction.POST_REQUEST);
 			if(alert != null) startImportButton.triggerAction(alert, TriggeringAction.POST_REQUEST, TriggeredAction.GET_REQUEST);
 			
-			deleteIntervalButton = new ButtonConfirm(page, "deleteInterval", "Delete Interval of row") {
+			/*deleteIntervalButton = new ButtonConfirm(page, "deleteInterval", "Delete Interval of row") {
 				private static final long serialVersionUID = 1L;
 				@Override
 				public void onPOSTComplete(String data, OgemaHttpRequest req) {
@@ -163,7 +162,7 @@ public class CsvImportPage implements LazyWidgetPage {
 						text = tsList.get(0).getPath()+" and "+(tsList.size()-1)+" more";
 					return "Really delete "+text+" for selected interval?";
 				}
-			};
+			};*/
 			
 			buildPage();
 			setDependencies();
@@ -189,7 +188,7 @@ public class CsvImportPage implements LazyWidgetPage {
 					.addItem("Options", true, null).addItem(options, false, null)
 					.addItem("Sampling interval", true, null).addItem(samplingFlex, false, null)
 					.addItem(nrDatapointsTrigger, true, null).addItem(nrDatapoints, false, null)
-					.addItem(startImportButton, true, null).addItem(deleteIntervalButton, false, null);
+					.addItem(startImportButton, true, null).addItem(importUpload, false, null);
 			grid.setDefaultAppendFillColumn(true);
 			page.append(grid);
 		}
