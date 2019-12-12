@@ -86,42 +86,48 @@ public class CsvExportPage implements LazyWidgetPage {
 	
 	@Override
 	public void init(ApplicationManager appMan, WidgetPage<?> page) {
-		new CsvExportPageInit(page, factory, appMan);
+		new CsvExportPageInit(page, factory, appMan, false, "_export");
 	}
 	
-	private static class CsvExportPageInit {
+	static class CsvExportPageInit {
 
-		private final WidgetPage<?> page;
-		private final Header header;
-		private final Alert alert;
-		private final FendoSelector slotsSelector;
-		private final Multiselect tagsSelect;
-		private final PropertiesFlexbox propertiesBox;
-		private final Button applySelection;
-		private final TemplateMultiselect<FendoTimeSeries> seriesSelector;
-		private final Datepicker startPicker;
-		private final Datepicker endPicker;
-		private final Checkbox2 options;
-		private final ValueInputField<Long> samplingInterval;
-		private final EnumDropdown<TimeUnit> samplingUnitSelector;
-		private final Label nrDatapoints;
-		private final Button nrDatapointsTrigger;
-		private final Download download;
-		private final Button downloadTrigger;
+		protected final WidgetPage<?> page;
+		protected Header header = null;
+		protected final Alert alert;
+		protected final FendoSelector slotsSelector;
+		protected final Multiselect tagsSelect;
+		protected final PropertiesFlexbox propertiesBox;
+		protected final Button applySelection;
+		protected final TemplateMultiselect<FendoTimeSeries> seriesSelector;
+		protected final Datepicker startPicker;
+		protected final Datepicker endPicker;
+		protected final Checkbox2 options;
+		private ValueInputField<Long> samplingInterval = null;
+		private EnumDropdown<TimeUnit> samplingUnitSelector = null;
+		protected final Label nrDatapoints;
+		protected final Button nrDatapointsTrigger;
+		private Download download = null;
+		private Button downloadTrigger = null;
 		private static final String SINGLE_FILE_PROP = "singlefile";
 		private static final String DATES_FIXED_PROP = "datesfixed";
 		private static final String ALIGN_TIMESTAMPS_PROP = "aligntimestamps";
 	
+		protected final String subId;
+		
 		@SuppressWarnings("serial")
-		CsvExportPageInit(final WidgetPage<?> page, final FendoDbFactory factory, final ApplicationManager am) {
+		CsvExportPageInit(final WidgetPage<?> page, final FendoDbFactory factory,
+				final ApplicationManager am, boolean isInherited, String subId) {
 			this.page = page;
-			page.setTitle("FendoDB CSV export");
-			this.header = new Header(page, "header", "CSV export");
-			header.addDefaultStyle(WidgetData.TEXT_ALIGNMENT_LEFT);
-			header.setDefaultColor("blue");
-			this.alert = new Alert(page, "alert", "");
+			this.subId = subId;
+			if(!isInherited) {
+				page.setTitle("FendoDB CSV export");
+				this.header = new Header(page, "header"+subId, "CSV export");
+				header.addDefaultStyle(WidgetData.TEXT_ALIGNMENT_LEFT);
+				header.setDefaultColor("blue");
+			}
+			this.alert = new Alert(page, "alert"+subId, "");
 			alert.setDefaultVisibility(false);
-			this.slotsSelector = new FendoSelector(page, "slotsSelector", factory) {
+			this.slotsSelector = new FendoSelector(page, "slotsSelector"+subId, factory) {
 	
 				// initialize time series selector
 				@Override
@@ -145,7 +151,7 @@ public class CsvExportPage implements LazyWidgetPage {
 				}
 	
 			};
-			this.tagsSelect = new Multiselect(page, "tagsSelect") {
+			this.tagsSelect = new Multiselect(page, "tagsSelect"+subId) {
 	
 				@Override
 				public void onGET(OgemaHttpRequest req) {
@@ -166,8 +172,8 @@ public class CsvExportPage implements LazyWidgetPage {
 				}
 	
 			};
-			this.propertiesBox = new PropertiesFlexbox(page, "propertiesBox");
-			this.applySelection = new Button(page, "applySelection", "Apply filters") {
+			this.propertiesBox = new PropertiesFlexbox(page, "propertiesBox"+subId);
+			this.applySelection = new Button(page, "applySelection"+subId, "Apply filters") {
 	
 				@Override
 				public void onPOSTComplete(String data, OgemaHttpRequest req) {
@@ -195,7 +201,7 @@ public class CsvExportPage implements LazyWidgetPage {
 	
 			};
 			this.applySelection.addDefaultStyle(ButtonData.BOOTSTRAP_BLUE);
-			this.seriesSelector = new TemplateMultiselect<>(page, "seriesSelector");
+			this.seriesSelector = new TemplateMultiselect<>(page, "seriesSelector"+subId);
 			seriesSelector.setTemplate(new DisplayTemplate<FendoTimeSeries>() {
 				
 				@Override
@@ -209,7 +215,7 @@ public class CsvExportPage implements LazyWidgetPage {
 				}
 				
 			});
-			this.nrDatapoints = new Label(page, "nrDatapoinst") {
+			this.nrDatapoints = new Label(page, "nrDatapoinst"+subId) {
 				
 				public void onGET(OgemaHttpRequest req) {
 					final OgemaWidget trigger = page.getTriggeringWidget(req);
@@ -218,7 +224,7 @@ public class CsvExportPage implements LazyWidgetPage {
 				}
 				
 			};
-			this.nrDatapointsTrigger = new Button(page, "nrDatapointsTrigger", "Estimate nr of points") {
+			this.nrDatapointsTrigger = new Button(page, "nrDatapointsTrigger"+subId, "Estimate nr of points") {
 				
 				public void onPOSTComplete(String data, OgemaHttpRequest req) {
 					final Collection<FendoTimeSeries> series = seriesSelector.getSelectedItems(req);
@@ -249,9 +255,10 @@ public class CsvExportPage implements LazyWidgetPage {
 				}
 				
 			};
-			this.startPicker = new CsvStartEndPicker(page, "startPicker", true);
-			this.endPicker = new CsvStartEndPicker(page, "endPicker", false);
-			this.options = new Checkbox2(page, "optionsCheck") {
+			this.startPicker = new CsvStartEndPicker(page, "startPicker"+subId, true);
+			this.endPicker = new CsvStartEndPicker(page, "endPicker"+subId, false);
+			
+			this.options = new Checkbox2(page, "optionsCheck"+subId) {
 				
 				public void onGET(OgemaHttpRequest req) {
 					if (!isChecked(ALIGN_TIMESTAMPS_PROP, req))
@@ -259,6 +266,12 @@ public class CsvExportPage implements LazyWidgetPage {
 				}
 				
 			};
+			if(isInherited) {
+				options.setDefaultCheckboxList(Arrays.asList(
+						new DefaultCheckboxEntry(DATES_FIXED_PROP, "Fix interval on schedule change", false)
+				));
+				return;
+			}
 			options.setDefaultCheckboxList(Arrays.asList(
 					new DefaultCheckboxEntry(SINGLE_FILE_PROP, "Write to single file", true),
 					new DefaultCheckboxEntry(DATES_FIXED_PROP, "Fix interval on schedule change", false),
@@ -356,7 +369,7 @@ public class CsvExportPage implements LazyWidgetPage {
 			setDependencies();
 		}
 	
-		private final void buildPage() {
+		protected void buildPage() {
 			int row = 0;
 			page.append(header).append(alert).linebreak().append(new StaticTable(2, 3, new int[] {2,2,8})
 				.setContent(row, 0, "Select FendoDB").setContent(row++, 1, slotsSelector)
@@ -383,7 +396,7 @@ public class CsvExportPage implements LazyWidgetPage {
 			page.linebreak().append(download);
 		}
 	
-		private final void setDependencies() {
+		protected final void setDependencies() {
 			slotsSelector.triggerAction(tagsSelect, TriggeringAction.POST_REQUEST, TriggeredAction.GET_REQUEST);
 			slotsSelector.triggerAction(seriesSelector, TriggeringAction.GET_REQUEST, TriggeredAction.GET_REQUEST); // initial schedules selection
 			slotsSelector.triggerAction(seriesSelector, TriggeringAction.POST_REQUEST, TriggeredAction.GET_REQUEST); // initial schedules selection
@@ -393,10 +406,12 @@ public class CsvExportPage implements LazyWidgetPage {
 			applySelection.triggerAction(alert, TriggeringAction.POST_REQUEST, TriggeredAction.GET_REQUEST);
 			
 			nrDatapointsTrigger.triggerAction(nrDatapoints, TriggeringAction.POST_REQUEST, TriggeredAction.GET_REQUEST);
-			downloadTrigger.triggerAction(download, TriggeringAction.POST_REQUEST, FileDownloadData.GET_AND_STARTDOWNLOAD);
 			
-			options.triggerAction(samplingInterval, TriggeringAction.POST_REQUEST, TriggeredAction.GET_REQUEST);
-			options.triggerAction(samplingUnitSelector, TriggeringAction.POST_REQUEST, TriggeredAction.GET_REQUEST);
+			if(download != null) {
+				downloadTrigger.triggerAction(download, TriggeringAction.POST_REQUEST, FileDownloadData.GET_AND_STARTDOWNLOAD);
+				options.triggerAction(samplingInterval, TriggeringAction.POST_REQUEST, TriggeredAction.GET_REQUEST);
+				options.triggerAction(samplingUnitSelector, TriggeringAction.POST_REQUEST, TriggeredAction.GET_REQUEST);
+			}
 			options.triggerAction(nrDatapoints, TriggeringAction.POST_REQUEST, TriggeredAction.GET_REQUEST);
 			options.triggerAction(options, TriggeringAction.POST_REQUEST, TriggeredAction.GET_REQUEST);
 			
