@@ -56,15 +56,24 @@ public class FendoDBImportUtils {
      */
     public static String importCSVData(FendoTimeSeries fts,
             ImportFormat inputFormat, FileItem fileItem) {
+    	try {
+			return importCSVData(fts, inputFormat, fileItem.getInputStream());
+		} catch (IOException ex) {
+            LOGGER.error("CVS import failed", ex);
+            return String.format("ERROR: CSV import failed (%s)", ex.getMessage());
+		}
+    }
+    public static String importCSVData(FendoTimeSeries fts,
+            ImportFormat inputFormat, InputStream inputStream) {
         String msg = "OK";
         switch (inputFormat) {
             case EMONCMS : {
                 try {
-                List<SampledValue> values = readEmonCmsCSV(fileItem.getInputStream());
+                List<SampledValue> values = readEmonCmsCSV(inputStream);
                 LOGGER.info("inserting {} values from CSV import into {}", values.size(), fts.getPath());
                 fts.insertValues(values);
                 msg = String.format("%d values inserted into time series %s", values.size(), fts.getPath());
-                } catch (IOException | DataRecorderException ex) {
+                } catch (DataRecorderException ex) {
                     LOGGER.error("CVS import failed", ex);
                     msg = String.format("ERROR: CSV import failed (%s)", ex.getMessage());
                 }
