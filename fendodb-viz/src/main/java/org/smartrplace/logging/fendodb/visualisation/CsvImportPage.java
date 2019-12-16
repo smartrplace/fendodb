@@ -183,7 +183,7 @@ public class CsvImportPage implements LazyWidgetPage {
 		                    alert.showAlert("Could not open:"+filePath, false, req);						
 						}
 					}
-					if(alert != null) alert.showAlert("Started Upload!", true, req);
+					if(alert != null) alert.showAlert("Finished Upload!", true, req);
 				}
 			};
 	    	startImportButton.triggerAction(importUpload, TriggeringAction.POST_REQUEST, TriggeredAction.POST_REQUEST);
