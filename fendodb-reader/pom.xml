@@ -10,7 +10,7 @@
     </parent>
 
 	<artifactId>fendodb-reader</artifactId>
-	<name>SlotsDB timeseries database API</name>
+	<name>FendoDB reader</name>
 
 	<packaging>jar</packaging>
 

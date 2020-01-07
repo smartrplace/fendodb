@@ -55,7 +55,7 @@ public class FlexibleIntervalFileObject extends FileObject {
 
 	@Override
 	public void append(double value, long timestamp, byte flag) throws IOException {
-		// long writePosition = dataFile.length();
+		// long writePosition = length;
 		if (!canWrite) {
 			enableOutput();
 		}
@@ -65,6 +65,7 @@ public class FlexibleIntervalFileObject extends FileObject {
 			dos.writeDouble(value);
 			dos.writeByte(flag);
 			lastTimestamp = timestamp;
+			length += 17;
 		}
 
 	}
@@ -85,7 +86,7 @@ public class FlexibleIntervalFileObject extends FileObject {
 					enableInput();
 				}
 				fis.getChannel().position(headerend);
-				byte[] b = new byte[(int) (dataFile.length() - headerend)];
+				byte[] b = new byte[(int) (length - headerend)];
 				dis.read(b, 0, b.length);
 				ByteBuffer bb = ByteBuffer.wrap(b);
 				// set position to last entries timestamp (Long, Double and Byte size in bits
@@ -114,7 +115,7 @@ public class FlexibleIntervalFileObject extends FileObject {
 		long startpos = headerend;
 
 		fis.getChannel().position(startpos);
-		byte[] b = new byte[(int) (dataFile.length() - headerend)];
+		byte[] b = new byte[(int) (length - headerend)];
 		dis.read(b, 0, b.length);
 		ByteBuffer bb = ByteBuffer.wrap(b);
 		// casting is a hack to avoid incompatibility when building this on Java 9 and run on Java 8
@@ -149,13 +150,13 @@ public class FlexibleIntervalFileObject extends FileObject {
 		long startpos = headerend;
 
 		fis.getChannel().position(startpos);
-		byte[] b = new byte[(int) (dataFile.length() - headerend)];
+		byte[] b = new byte[(int) (length - headerend)];
 		dis.read(b, 0, b.length);
 		ByteBuffer bb = ByteBuffer.wrap(b);
 		// casting is a hack to avoid incompatibility when building this on Java 9 and run on Java 8
 		// ByteBuffer#rewind used to return a Buffer in Jdk8, but from Java 9 on returns a ByteBuffer
 		((Buffer) bb).rewind();
-		int countOfDataSets = (int) ((dataFile.length() - headerend) / getDataSetSize());
+		int countOfDataSets = (int) ((length - headerend) / getDataSetSize());
 		for (int i = 0; i < countOfDataSets; i++) {
 			long timestamp = bb.getLong();
 			double d = bb.getDouble();
@@ -179,13 +180,13 @@ public class FlexibleIntervalFileObject extends FileObject {
 		long startpos = headerend;
 
 		fis.getChannel().position(startpos);
-		byte[] b = new byte[(int) (dataFile.length() - headerend)];
+		byte[] b = new byte[(int) (length - headerend)];
 		dis.read(b, 0, b.length);
 		ByteBuffer bb = ByteBuffer.wrap(b);
 		// casting is a hack to avoid incompatibility when building this on Java 9 and run on Java 8
 		// ByteBuffer#rewind used to return a Buffer in Jdk8, but from Java 9 on returns a ByteBuffer
 		((Buffer) bb).rewind();
-		int countOfDataSets = (int) ((dataFile.length() - headerend) / 17);
+		int countOfDataSets = (int) ((length - headerend) / 17);
 		for (int i = 0; i < countOfDataSets; i++) {
 			long timestamp2 = bb.getLong();
 			double d = bb.getDouble();
@@ -214,13 +215,13 @@ public class FlexibleIntervalFileObject extends FileObject {
 		long startpos = headerend;
 
 		fis.getChannel().position(startpos);
-		byte[] b = new byte[(int) (dataFile.length() - headerend)];
+		byte[] b = new byte[(int) (length - headerend)];
 		dis.read(b, 0, b.length);
 		ByteBuffer bb = ByteBuffer.wrap(b);
 		// casting is a hack to avoid incompatibility when building this on Java 9 and run on Java 8
 		// ByteBuffer#rewind used to return a Buffer in Jdk8, but from Java 9 on returns a ByteBuffer
 		((Buffer) bb).rewind();
-		int countOfDataSets = (int) ((dataFile.length() - headerend) / getDataSetSize());
+		int countOfDataSets = (int) ((length - headerend) / getDataSetSize());
 		for (int i = 0; i < countOfDataSets; i++) {
 			long timestamp2 = bb.getLong();
 			double d = bb.getDouble();
@@ -241,13 +242,13 @@ public class FlexibleIntervalFileObject extends FileObject {
 
 		/*
 		fis.getChannel().position(startpos);
-		byte[] b = new byte[(int) (dataFile.length() - headerend)];
+		byte[] b = new byte[(int) (length - headerend)];
 		dis.read(b, 0, b.length);
 		ByteBuffer bb = ByteBuffer.wrap(b);
 		((Buffer) bb).rewind();
 		*/
-		final MappedByteBuffer bb = fis.getChannel().map(FileChannel.MapMode.READ_ONLY, startpos, dataFile.length() - headerend);
-		int countOfDataSets = (int) ((dataFile.length() - headerend) / getDataSetSize());
+		final MappedByteBuffer bb = fis.getChannel().map(FileChannel.MapMode.READ_ONLY, startpos, length - headerend);
+		int countOfDataSets = (int) ((length - headerend) / getDataSetSize());
 		long tcand = Long.MIN_VALUE;
 		double dcand = Double.NaN;
 		Quality qcand = null;
@@ -271,7 +272,7 @@ public class FlexibleIntervalFileObject extends FileObject {
 
 	@Override
 	protected int getDataSetCountInternal() {
-		return (int) ((dataFile.length() - headerend) / getDataSetSize());
+		return (int) ((length - headerend) / getDataSetSize());
 	}
 
 	@Override
@@ -286,7 +287,7 @@ public class FlexibleIntervalFileObject extends FileObject {
 		}
 		long startpos = headerend;
 		fis.getChannel().position(startpos);
-		byte[] b = new byte[(int) (dataFile.length() - headerend)];
+		byte[] b = new byte[(int) (length - headerend)];
 		dis.read(b, 0, b.length);
 		ByteBuffer bb = ByteBuffer.wrap(b);
 		// casting is a hack to avoid incompatibility when building this on Java 9 and run on Java 8
