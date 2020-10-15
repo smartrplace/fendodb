@@ -119,6 +119,7 @@ public class SlotsDb implements CloseableDataRecorder {
 
 	final boolean secure;
 	final FrameworkClock clock;
+	private final boolean isOgemaHistoryDb;
 	private final Set<Consumer<FendoTimeSeries>> timeSeriesListeners = Collections.synchronizedSet(new HashSet<>(2)); // typically empty or one entry
 
 	public SlotsDb(Path dbBaseFolder, FrameworkClock clock, FendoDbConfiguration configuration, SlotsDbFactoryImpl factory) throws IOException {
@@ -133,6 +134,7 @@ public class SlotsDb implements CloseableDataRecorder {
 		if (hardConfigReset && configuration == null)
 			throw new IllegalArgumentException("Config reset without configuration?");
 		Files.createDirectories(dbBaseFolder);
+		this.isOgemaHistoryDb = factory != null && dbBaseFolder.equals(factory.ogemaHistoryDb);
 		this.slotsDbStoragePath = dbBaseFolder.resolve(STORAGE_PERSISTENCE_FILE);
 		this.persistentConfig = dbBaseFolder.resolve(CONFIG_PERSISTENCE_FILE);
 		this.tagsPath = dbBaseFolder.resolve(TAGS_PERSISTENCE_FILE);
@@ -807,7 +809,10 @@ public class SlotsDb implements CloseableDataRecorder {
 
 	CloseableDataRecorder getProxyDb(boolean readOnly) {
 		checkActiveStatus();
-		return new SlotsDbProxy(this, readOnly);
+		final SlotsDbProxy proxy = new SlotsDbProxy(this, readOnly);
+		if (isOgemaHistoryDb) // need special resource permission checks for access to timeseries
+			return new SlotsDbProxyResources(proxy, this.factory.resourceDb);
+		return proxy;
 	}
 
 	@Override

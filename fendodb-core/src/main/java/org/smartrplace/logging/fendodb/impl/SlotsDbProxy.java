@@ -45,10 +45,10 @@ import org.smartrplace.logging.fendodb.search.TimeSeriesMatcher;
 class SlotsDbProxy implements CloseableDataRecorder {
 
 	final SlotsDb master;
-	private final boolean hasWritePermission;
-	private final boolean hasAdminPermission;
+	final boolean hasWritePermission;
+	final boolean hasAdminPermission;
 	private final FendoDbConfiguration config;
-	private final FendoDbAccessControl accessManager;
+	final FendoDbAccessControl accessManager;
 	private final AtomicBoolean closed = new AtomicBoolean(false);
 
 	SlotsDbProxy(SlotsDb master, boolean readOnly) {
