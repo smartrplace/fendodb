@@ -23,6 +23,8 @@ import org.smartrplace.logging.fendodb.permissions.FendoDbPermission;
 
 class PermissionUtils {
 	
+	private PermissionUtils() {}
+	
 	final static void checkWritePermission(final Path path, final FendoDbAccessControl accessManager) {
 		checkPermission(path, FendoDbPermission.WRITE, accessManager);
 	}

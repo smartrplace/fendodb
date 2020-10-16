@@ -21,6 +21,8 @@ import java.io.ObjectOutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.security.AccessController;
+import java.security.PrivilegedAction;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -48,8 +50,10 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.ogema.core.administration.FrameworkClock;
+import org.ogema.persistence.ResourceDB;
 import org.osgi.framework.BundleContext;
 import org.osgi.framework.ServiceRegistration;
+import org.osgi.service.component.ComponentServiceObjects;
 import org.osgi.service.component.annotations.Activate;
 import org.osgi.service.component.annotations.Component;
 import org.osgi.service.component.annotations.Deactivate;
@@ -91,6 +95,7 @@ public class SlotsDbFactoryImpl implements FendoDbFactory {
 	@Reference(cardinality=ReferenceCardinality.OPTIONAL)
 	private FrameworkClock clock;
 	
+	// FIXME why optional and dynamic? this does not look right
 	@Reference(
 			service=FendoDbAccessControl.class,
 			cardinality=ReferenceCardinality.OPTIONAL,
@@ -98,12 +103,34 @@ public class SlotsDbFactoryImpl implements FendoDbFactory {
 			policyOption=ReferencePolicyOption.GREEDY
 	)
 	volatile FendoDbAccessControl accessManager;
+	
+	@Reference(
+			service=ResourceDB.class,
+			cardinality=ReferenceCardinality.OPTIONAL,
+			policy=ReferencePolicy.STATIC,
+			policyOption=ReferencePolicyOption.GREEDY
+	)
+	ComponentServiceObjects<ResourceDB> resourceDb;
+	// only relevant if security is active and resourceDb is available. Otherwise set to null.
+	Path ogemaHistoryDb;
 
 	// ctx is null in tests... must be able to deal with this case
 	@SuppressWarnings("unchecked")
 	@Activate
 	public void activate(final BundleContext ctx) {
 		isSecure = System.getSecurityManager() != null;
+		if (isSecure && this.resourceDb != null) {
+			String ogemaDb0 = AccessController.doPrivileged(new PrivilegedAction<String>() {
+	
+					@Override
+					public String run() {
+						return ctx.getProperty("org.ogema.recordeddata.slotsdb.dbfolder");
+					}
+			});
+			if (ogemaDb0 == null)
+				ogemaDb0 = "data/slotsdb";
+			this.ogemaHistoryDb = normalize(BASE.resolve(ogemaDb0));
+		}
 		final Hashtable<String, Object> props = new Hashtable<String, Object>();
 		props.put("osgi.command.scope", "fendodb");
 		props.put("osgi.command.function", new String[] {
