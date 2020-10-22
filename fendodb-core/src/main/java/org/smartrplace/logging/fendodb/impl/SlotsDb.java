@@ -15,6 +15,7 @@
  */
 package org.smartrplace.logging.fendodb.impl;
 
+import java.io.EOFException;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
@@ -65,6 +66,7 @@ import org.ogema.core.channelmanager.measurements.SampledValue;
 import org.ogema.core.recordeddata.RecordedDataConfiguration;
 import org.ogema.core.recordeddata.RecordedDataConfiguration.StorageType;
 import org.ogema.recordeddata.DataRecorderException;
+import org.osgi.service.log.LogEntry;
 import org.smartrplace.logging.fendodb.CloseableDataRecorder;
 import org.smartrplace.logging.fendodb.DataRecorderReference;
 import org.smartrplace.logging.fendodb.FendoDbConfiguration;
@@ -558,6 +560,9 @@ public class SlotsDb implements CloseableDataRecorder {
 			return null;
 		try (ObjectInputStream ois = new ObjectInputStream(Files.newInputStream(path))) {
 			return (Map<String,Map<String, List<String>>>) ois.readObject();
+		} catch (EOFException e1) {
+			FileObjectProxy.logger.warn("EOFException in " + path);
+			return null;
 		} catch (ClassCastException | ClassNotFoundException e) {
 			throw new IOException(e);
 		}
