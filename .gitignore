@@ -10,3 +10,10 @@ testdata/
 *.class
 pom.xml.versionsBackup
 pom.xml.releaseBackup
+docker/bin/
+docker/data/
+docker/security/
+docker/ogema.zip
+docker/ogema-launcher.jar
+docker/ogema-launcher.lock
+

@@ -1,0 +1,10 @@
+{ 
+ 	"org.smartrplace.logging.FendoDbInit~fendodbBak": 
+        { 
+			"path":"fendodbBak",
+			"constructEagerly": true,
+			"readOnly": true
+       },
+   ":configurator:version":"1",
+   ":configurator:symbolic-name":"initialFendoDbs"
+}

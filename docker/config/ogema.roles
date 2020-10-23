@@ -1,0 +1,3 @@
+allow { [natural "master"] (java.security.AllPermission)} "master"
+allow { [machine "rest"] (org.ogema.accesscontrol.ResourcePermission "path=*" "read,write,create,addsub,activity,delete") (org.smartrplace.logging.fendodb.permissions.FendoDbPermission "data/slotsdb" "read,write,admin")} "rest"
+
