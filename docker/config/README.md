@@ -19,13 +19,6 @@ FendoDB requires Java 8 or higher.
 
 ---
 ## Getting started
-
-### Using Docker
-
-See [the Docker instructions](./docker/README.md).
-
-### Using OSGi
-
 Download the run configuration [rundir-ogema-felix](https://github.com/smartrplace/osgi-run-configs/raw/master/rundir-ogema-felix/rundir-ogema-felix.zip), and start it using one of the provided start scripts (see [https://github.com/smartrplace/osgi-run-configs](https://github.com/smartrplace/osgi-run-configs) for more information on configuration options). The rundir contains the compiled FendoDB bundles in the folder `init`. 
 
 Use the [REST interface](https://github.com/smartrplace/fendodb/wiki/REST-API) or the [shell commands](https://github.com/smartrplace/fendodb/wiki/Shell-commands) to create a database instance and to add data points, or open the visualization page at https://localhost:8443/org/smartrplace/slotsdb/visualisation/index.html in the Browser.

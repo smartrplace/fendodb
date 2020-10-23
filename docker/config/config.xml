@@ -1,0 +1,218 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE configuration 
+[
+	<!ENTITY fendodb-version "0.1.0">
+	<!ENTITY ogema-version "2.2.1">
+	<!ENTITY widgets-version "2.2.1">
+	<!ENTITY slf4j-version "1.7.30">
+	<!ENTITY jackson-version "2.11.3">
+]>
+<configuration xmlns="http://www.ogema-source.net/config"
+	       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	       xsi:schemaLocation="http://www.ogema-source.net/config https://www.ogema-source.net/config-1.2.1.xsd">
+	<!-- select one framework bundle; note the different licensing conditions -->
+	<frameworkbundle dir="bin/system" groupId="org.apache.felix" artifactId="org.apache.felix.framework" version="6.0.3" />
+	<!-- <frameworkbundle dir="bin/system" groupId="org.eclipse.tycho" artifactId="org.eclipse.osgi" version="3.13.0.v20180226-1711" />  -->
+
+	<bundles>
+		<!-- only required with Felix framework bundle -->
+		<bundle dir="bin/system" groupId="org.apache.felix" artifactId="org.apache.felix.framework.security" version="2.6.1" startLevel="1" />
+		<bundle dir="bin/ogema" groupId="org.ogema.ref-impl" artifactId="permission-admin" version="&ogema-version;" startLevel="1" />
+
+		<bundle dir="bin/osgi" groupId="org.osgi" artifactId="org.osgi.util.function" version="1.1.0" startLevel="2" />
+		<bundle dir="bin/osgi" groupId="org.osgi" artifactId="org.osgi.util.promise" version="1.1.1" startLevel="2" />
+		<bundle dir="bin/osgi" groupId="org.osgi" artifactId="org.osgi.util.pushstream" version="1.0.1" startLevel="2" />
+		<bundle dir="bin/osgi" groupId="org.apache.felix" artifactId="org.apache.felix.scr" version="2.1.16" startLevel="2" />
+		<bundle dir="bin/osgi" groupId="org.apache.felix" artifactId="org.apache.felix.configadmin" version="1.9.16" startLevel="2" />
+		<bundle dir="bin/osgi" groupId="org.apache.felix" artifactId="org.apache.felix.converter" version="1.0.8" startLevel="2" />
+		<bundle dir="bin/osgi" groupId="org.apache.felix" artifactId="org.apache.felix.configurator" version="1.0.10" startLevel="2" />
+		<bundle dir="bin/osgi" groupId="org.apache.felix" artifactId="org.apache.felix.metatype" version="1.2.2" startLevel="2" />
+		<bundle dir="bin/osgi" groupId="org.osgi" artifactId="org.osgi.service.useradmin" version="1.1.0" />
+		<bundle dir="bin/osgi" groupId="org.ogema.external" artifactId="org.apache.felix.useradmin" version="1.0.3" startLevel="2" />
+		<bundle dir="bin/osgi" groupId="org.ogema.external" artifactId="org.apache.felix.useradmin.filestore" version="1.0.2" startLevel="2" />
+		<bundle dir="bin/osgi" groupId="org.apache.felix" artifactId="org.apache.felix.eventadmin" version="1.5.0" startLevel="2" />
+		<bundle dir="bin/osgi" groupId="org.apache.felix" artifactId="org.apache.felix.gogo.runtime" version="1.1.2" startLevel="2" />
+		<bundle dir="bin/osgi" groupId="org.apache.felix" artifactId="org.apache.felix.gogo.command" version="1.1.0" startLevel="2" />
+		<bundle dir="bin/osgi" groupId="org.apache.felix" artifactId="org.apache.felix.shell.remote" version="1.2.0" startLevel="2" />
+		<bundle dir="bin/osgi" groupId="org.jline" artifactId="jline" version="3.12.1" />
+		<bundle dir="bin/osgi" groupId="org.apache.felix" artifactId="org.apache.felix.gogo.jline" version="1.1.0" startLevel="2" />
+
+		
+		<bundle dir="bin/osgi" groupId="org.apache.felix" artifactId="org.apache.felix.fileinstall" version="3.6.4" startLevel="1" />
+		<bundle dir="bin/osgi" groupId="org.apache.felix" artifactId="org.apache.felix.http.servlet-api" version="1.1.2" startLevel="2" />
+
+		<bundle dir="bin/osgi" groupId="org.apache.felix" artifactId="org.apache.felix.http.jetty" version="4.1.0" startLevel="3" /> 
+		<bundle dir="bin/osgi" groupId="org.eclipse.jetty" artifactId="jetty-servlets" version="9.4.31.v20200723" startLevel="3" />
+		<bundle dir="bin/osgi" groupId="org.eclipse.jetty" artifactId="jetty-proxy" version="9.4.31.v20200723" startLevel="3" />
+		<!-- logging bundles, the SLF4J implemenation is provided by ogema-logger (via logback) -->
+		<bundle dir="bin/osgi" groupId="org.osgi" artifactId="org.osgi.service.log" version="1.3.0" startLevel="2" />
+		<bundle dir="bin/logging" groupId="org.slf4j" artifactId="slf4j-api" version="&slf4j-version;" />
+		<bundle dir="bin/logging" groupId="org.slf4j" artifactId="osgi-over-slf4j" version="&slf4j-version;" />
+		<bundle dir="bin/logging" groupId="org.slf4j" artifactId="log4j-over-slf4j" version="&slf4j-version;" />
+		<bundle dir="bin/logging" groupId="org.slf4j" artifactId="jul-to-slf4j" version="&slf4j-version;" />
+		<bundle dir="bin/logging" groupId="org.slf4j" artifactId="jcl-over-slf4j" version="&slf4j-version;" />
+		
+		<!-- 
+		    logger implementation: choose one
+		    We recommend the usage of the OGEMA logger, since it supports OGEMA's administrative logging API (else log level operations become NOOP), 
+			but every SLF4j logger can be used with OGEMA 
+		-->
+		<bundle dir="bin/ogema" groupId="org.ogema.ref-impl" artifactId="ogema-logger" version="&ogema-version;" startLevel="1" /> 
+		<!-- <bundle dir="bin/logging" groupId="org.slf4j" artifactId="slf4j-simple" version="&slf4j-version;" startLevel="1"/>-->
+		<!-- <bundle dir="bin/logging" groupId="org.ops4j.pax.logging" artifactId="pax-logging-api" version="1.10.1" startLevel="1" /> --><!-- comment out slf4j bundles above! -->
+		<!-- logback consists of two bundles -->
+		<!-- <bundle dir="bin/logging" groupId="ch.qos.logback" artifactId="logback-classic" version="1.2.3" startLevel="1" />
+			 <bundle dir="bin/logging" groupId="ch.qos.logback" artifactId="logback-core" version="1.2.3" startLevel="1" /> -->
+		
+		<!-- Commons bundles -->
+		<bundle dir="bin/commons" groupId="commons-fileupload" artifactId="commons-fileupload" version="1.4" />
+		<bundle dir="bin/commons" groupId="commons-io" artifactId="commons-io" version="2.6" />
+		<bundle dir="bin/commons" groupId="commons-codec" artifactId="commons-codec" version="1.12" />
+		<bundle dir="bin/commons" groupId="org.apache.commons" artifactId="commons-lang3" version="3.9" />
+		<bundle dir="bin/commons" groupId="org.apache.commons" artifactId="commons-csv" version="1.7" startLevel="3"/> 
+		<!-- Further common dependencies -->
+		<bundle dir="bin/commons" groupId="org.json" artifactId="json" version="20180813" />
+		<bundle dir="bin/commons" groupId="org.glassfish" artifactId="javax.json" version="1.1.4" />
+		<bundle dir="bin/commons" groupId="com.google.guava" artifactId="guava" version="27.0-jre" />
+		<bundle dir="bin/commons" groupId="org.ow2.asm" artifactId="asm" version="7.1" />
+		<bundle dir="bin/commons" groupId="joda-time" artifactId="joda-time" version="2.10.7" />
+		<bundle dir="bin/commons" groupId="net.bytebuddy" artifactId="byte-buddy" version="1.10.17" />
+		
+
+		<!-- felix web console (optional) -->
+		<bundle dir="bin/felix-webconsole" groupId="org.apache.felix" artifactId="org.apache.felix.webconsole" version="4.3.12" />
+		<bundle dir="bin/felix-webconsole" groupId="org.apache.felix" artifactId="org.apache.felix.webconsole.plugins.event" version="1.1.8" />
+		<bundle dir="bin/felix-webconsole" groupId="org.apache.felix" artifactId="org.apache.felix.inventory" version="1.0.6" />
+		<bundle dir="bin/felix-webconsole" groupId="org.apache.felix" artifactId="org.apache.felix.webconsole.plugins.ds" version="2.1.0" /> 
+		<bundle dir="bin/felix-webconsole" groupId="org.apache.felix" artifactId="org.apache.felix.webconsole.plugins.obr" version="1.0.4" />
+		<bundle dir="bin/felix-webconsole" groupId="org.apache.felix" artifactId="org.apache.felix.webconsole.plugins.memoryusage" version="1.0.10" />
+
+		<!-- jackson JSON mapper used by OGEMA serialization manager -->
+		<bundle dir="bin/jackson" groupId="com.fasterxml.jackson.core" artifactId="jackson-core" version="&jackson-version;" />
+		<bundle dir="bin/jackson" groupId="com.fasterxml.jackson.core" artifactId="jackson-annotations" version="&jackson-version;"  />
+		<bundle dir="bin/jackson" groupId="com.fasterxml.jackson.core" artifactId="jackson-databind" version="&jackson-version;" />
+		<bundle dir="bin/jackson" groupId="com.fasterxml.jackson.module" artifactId="jackson-module-jaxb-annotations" version="&jackson-version;"  />
+
+                <!-- FendoDB timeseries store -->
+		<bundle dir="bin/fendodb" groupId="org.smartrplace.logging" artifactId="fendodb-core" version="&fendodb-version;" startLevel="12"/>
+		<bundle dir="bin/fendodb" groupId="org.smartrplace.logging" artifactId="fendodb-grafana" version="&fendodb-version;" startLevel="12"/>
+		<bundle dir="bin/fendodb" groupId="org.smartrplace.logging" artifactId="fendodb-grafana-config" version="&fendodb-version;" startLevel="12"/>
+		<bundle dir="bin/fendodb" groupId="org.smartrplace.logging" artifactId="fendodb-ogema-context" version="&fendodb-version;" startLevel="12"/>
+		<bundle dir="bin/fendodb" groupId="org.smartrplace.logging" artifactId="fendodb-ogema-tagging" version="&fendodb-version;" startLevel="12"/>
+		<bundle dir="bin/fendodb" groupId="org.smartrplace.logging" artifactId="fendodb-recordeddata-wrapper" version="&fendodb-version;" startLevel="12"/>
+		<bundle dir="bin/fendodb" groupId="org.smartrplace.logging" artifactId="fendodb-rest" version="&fendodb-version;" startLevel="12"/>
+		<!-- <bundle dir="bin/fendodb" groupId="org.smartrplace.logging" artifactId="fendodb-source" version="&fendodb-version;" startLevel="12"/>-->
+		<bundle dir="bin/fendodb" groupId="org.smartrplace.logging" artifactId="fendodb-tools" version="&fendodb-version;" startLevel="12"/>
+		<bundle dir="bin/fendodb" groupId="org.smartrplace.logging" artifactId="fendodb-viz" version="&fendodb-version;" startLevel="12"/>
+		<bundle dir="bin/fendodb" groupId="org.smartrplace.tools" artifactId="smartrplace-servlet-context" version="0.0.1" startLevel="12"/>
+
+		<!-- OGEMA Framework and direct dependencies -->
+		<bundle dir="bin/ogema" groupId="org.ogema.core" artifactId="api" version="&ogema-version;" startLevel="1" />
+		<bundle dir="bin/ogema" groupId="org.ogema.core" artifactId="models" version="&ogema-version;" />
+		<bundle dir="bin/ogema" groupId="org.ogema.ref-impl" artifactId="administration" version="&ogema-version;" />
+		<bundle dir="bin/ogema" groupId="org.ogema.ref-impl" artifactId="app-manager" version="&ogema-version;" />
+		<bundle dir="bin/ogema" groupId="org.ogema.ref-impl" artifactId="channel-manager" version="&ogema-version;" />
+		<bundle dir="bin/ogema" groupId="org.ogema.ref-impl" artifactId="framework-administration" version="&ogema-version;" />
+		<bundle dir="bin/ogema" groupId="org.ogema.ref-impl" artifactId="framework-gui" version="&ogema-version;" />		
+		<bundle dir="bin/ogema" groupId="org.ogema.ref-impl" artifactId="hardware-manager-rpi" version="&ogema-version;" startLevel="3" /> 
+		<bundle dir="bin/ogema" groupId="org.ogema.ref-impl" artifactId="hardware-manager" version="&ogema-version;" startLevel="4" />
+		<bundle dir="bin/ogema" groupId="org.ogema.ref-impl" artifactId="internal-api" version="&ogema-version;" />
+		<bundle dir="bin/ogema" groupId="org.ogema.tools" artifactId="memory-timeseries" version="&ogema-version;" />
+		<bundle dir="bin/ogema" groupId="org.ogema.ref-impl" artifactId="non-secure-apploader" version="&ogema-version;" />
+		<bundle dir="bin/ogema" groupId="org.ogema.ref-impl" artifactId="ogema-security-manager" version="&ogema-version;" />
+		<bundle dir="bin/ogema" groupId="org.ogema.ref-impl" artifactId="persistence" version="&ogema-version;" />
+                <!-- <bundle dir="bin/ogema" groupId="org.ogema.ref-impl" artifactId="recordeddata-slotsdb" version="&ogema-version;" /> -->
+		<bundle dir="bin/ogema" groupId="org.ogema.ref-impl" artifactId="rest" version="&ogema-version;" />
+		<bundle dir="bin/ogema" groupId="org.ogema.ref-impl" artifactId="resource-manager" version="&ogema-version;" />
+		<bundle dir="bin/ogema" groupId="org.ogema.ref-impl" artifactId="resource-access-advanced" version="&ogema-version;" />
+		<bundle dir="bin/ogema" groupId="org.ogema.tools" artifactId="resource-utils" version="&ogema-version;" />
+		<bundle dir="bin/ogema" groupId="org.ogema.ref-impl" artifactId="security" version="&ogema-version;" />
+		<bundle dir="bin/ogema" groupId="org.ogema.ref-impl" artifactId="security-gui" version="&ogema-version;" />
+		<bundle dir="bin/ogema" groupId="org.ogema.ref-impl" artifactId="util" version="&ogema-version;" />
+		
+		<!-- configuration, optional -->
+		<bundle dir="bin/ogema" groupId="org.ogema.ref-impl" artifactId="security-http-config" version="&ogema-version;"/>
+		
+		<!-- OGEMA widgets -->
+		<bundle dir="bin/widgets" groupId="org.ogema.widgets" artifactId="ogema-gui-api" version="&widgets-version;" startLevel="14" />
+		<bundle dir="bin/widgets" groupId="org.ogema.widgets" artifactId="ogema-js-bundle" version="&widgets-version;" startLevel="14" />
+		<bundle dir="bin/widgets" groupId="org.ogema.widgets" artifactId="lazy-pages-service" version="&widgets-version;" startLevel="14" />
+	 	<bundle dir="bin/widgets" groupId="org.ogema.widgets" artifactId="widget-collection" version="&widgets-version;" startLevel="14" />
+		<bundle dir="bin/widgets" groupId="org.ogema.widgets" artifactId="widget-extended" version="&widgets-version;" startLevel="14" />
+		<bundle dir="bin/widgets" groupId="org.ogema.widgets" artifactId="widget-experimental" version="&widgets-version;" startLevel="14"/>
+		<bundle dir="bin/widgets" groupId="org.ogema.widgets" artifactId="icon-service-impl" version="&widgets-version;" startLevel="14" />
+		<bundle dir="bin/widgets" groupId="org.ogema.widgets" artifactId="name-service-impl" version="&widgets-version;" startLevel="14" />  
+		
+		<!-- useful things -->
+		<bundle dir="bin/osgi" groupId="org.ops4j.pax.url" artifactId="pax-url-aether" version="2.6.1" startLevel="1" />
+		<!-- groovy: needs package sun.reflect in org.osgi.framework.system.packages.extra -->
+		<bundle dir="bin/tools" groupId="org.codehaus.groovy" artifactId="groovy-all" version="2.4.15" />
+		<bundle dir="bin/tools" groupId="org.ogema.tools" artifactId="ogema-console-scripting" version="&ogema-version;"/>
+		<bundle dir="bin/tools" groupId="org.ogema.tools" artifactId="pattern-debugger" version="&ogema-version;" />
+		<bundle dir="bin/tools" groupId="org.ogema.tools" artifactId="schedule-import" version="&ogema-version;"/> 
+		<bundle dir="bin/tools" groupId="org.ogema.tools" artifactId="timeseries-import" version="&ogema-version;" />
+		<bundle dir="bin/tools" groupId="org.ogema.tools" artifactId="timeseries-utils" version="&ogema-version;" />
+		<!-- requires Java >= 8; remove otherwise -->
+		<bundle dir="bin/tools" groupId="de.dentrassi.osgi" artifactId="net.luminis.cmc" version="0.6.0" startLevel="3"/>
+
+		<!-- OGEMA Applications -->
+		<bundle dir="bin/apps" groupId="org.ogema.apps" artifactId="basic-switch-gui" version="&ogema-version;" />
+		<bundle dir="bin/ogema" groupId="org.ogema.apps" artifactId="common-services" version="&ogema-version;" />
+		<bundle dir="bin/apps" groupId="org.ogema.apps" artifactId="device-configurator" version="&ogema-version;" />
+		<bundle dir="bin/apps" groupId="org.ogema.tools" artifactId="grafana-base" version="&ogema-version;" />
+		<bundle dir="bin/apps" groupId="org.ogema.apps" artifactId="grafana-logging" version="&ogema-version;" />
+		<bundle dir="bin/apps" groupId="org.ogema.apps" artifactId="grafana-schedule-viewer" version="&ogema-version;" /> 
+		<bundle dir="bin/apps" groupId="org.ogema.apps" artifactId="graph-generator" version="&ogema-version;" />
+		<bundle dir="bin/apps" groupId="org.ogema.apps" artifactId="logging-app" version="&ogema-version;" />    
+                
+
+		<!-- Remote REST connector and dependencies -->
+		<bundle dir="bin/drivers" groupId="org.ogema.drivers" artifactId="remote-rest-connector" version="&ogema-version;"/>
+		<bundle dir="bin/drivers" groupId="org.apache.httpcomponents" artifactId="httpcore-osgi" version="4.4.11" />
+		<bundle dir="bin/drivers" groupId="org.apache.httpcomponents" artifactId="httpclient-osgi" version="4.5.9" />
+		
+		-->
+
+	</bundles>
+
+	<properties>
+		<!--
+		<property key="org.osgi.framework.system.packages.extra" value="com.sun.xml.internal.bind.v2,sun.misc,sun.reflect" />-->
+		<property key="org.osgi.framework.bsnversion" value="multiple" />
+
+		<property key="eclipse.ignoreApp" value="true" />
+		<property key="osgi.console" value="" />
+		<property key="felix.log.level" value="info" />
+		<property key="ds.showtrace" value="false" />
+
+		<property key="org.osgi.service.http.port" value="8080" />
+		<property key="org.osgi.service.http.port.secure" value="8443" />
+		<property key="org.osgi.service.http.secure.enabled" value="true" />
+
+		<property key="org.apache.felix.http.debug" value="false" />
+		<property key="org.apache.felix.https.enable" value="true" />
+		<property key="org.apache.felix.https.keystore" value="config/keystore" />
+		<property key="org.apache.felix.https.keystore.password" value="ogemamns" />
+		<property key="org.apache.felix.https.keystore.key.password" value="ogemamns" />
+
+		<property key="org.ops4j.pax.web.ssl.keystore" value="myOgemaKeystore" />
+		<property key="org.ops4j.pax.web.ssl.password" value="ogemamns" />
+		<property key="org.ops4j.pax.web.ssl.keypassword" value="ogemamns" />
+
+		<property key="felix.fileinstall.log.level" value="-1" />
+	</properties>
+
+	<!-- List of files and directories to delete in case of a clean start -->
+	<deleteList>
+		<!-- delete osgi storage - required -->
+		<file>data/osgi-storage</file>
+		<!-- delete resource database -->
+		<file>data/resources</file>
+		<!-- delete text logs -->
+		<file>data/logs</file>
+		<!-- delete resource log data -->
+		<file>data/slotsdb</file>
+		<!-- delete users -->
+		<file>security/users/ua_repo.dat</file>
+	</deleteList>
+</configuration>
