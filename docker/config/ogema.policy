@@ -1,0 +1,7 @@
+# basic rights granted to all bundles
+allow { [org.osgi.service.condpermadmin.BundleLocationCondition "file:./bin/*"] (java.security.AllPermission) } "all"
+# user rights proxies:
+allow { [org.osgi.service.condpermadmin.BundleLocationCondition "urp:*"] (org.osgi.framework.PackagePermission "org.ogema.accesscontrol" "import") (org.osgi.framework.PackagePermission "org.osgi.*" "import") (org.osgi.framework.PackagePermission "org.ogema.core.application" "import") (org.osgi.framework.PackagePermission "org.slf4j" "import") (org.osgi.framework.PackagePermission "org.apache.felix.scr.annotations" "import") (org.osgi.framework.ServicePermission "org.ogema.accesscontrol.UserRightsProxy" "register") (org.osgi.framework.ServicePermission "org.ogema.core.application.Application" "register") (org.osgi.framework.ServicePermission "org.ogema.accesscontrol.PermissionManager" "get")} "urps"
+# basic pages/servlets visible to all users
+allow { [org.osgi.service.condpermadmin.BundleLocationCondition "urp:*"] (org.ogema.accesscontrol.WebAccessPermission "name=org.smartrplace.tools.smartrplace-servlet-context") (org.ogema.accesscontrol.WebAccessPermission "name=org.ogema.widgets.ogema-js-bundle") (org.ogema.accesscontrol.WebAccessPermission "name=org.ogema.ref-impl.framework-gui")(org.ogema.accesscontrol.WebAccessPermission "name=org.ogema.widgets.widget-experimental")(org.ogema.accesscontrol.WebAccessPermission "name=org.ogema.widgets.widget-collection")} "staticpagepermissions"
+
