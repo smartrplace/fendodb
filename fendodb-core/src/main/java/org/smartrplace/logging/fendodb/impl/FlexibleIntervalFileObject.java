@@ -21,6 +21,7 @@ import java.io.IOException;
 import java.nio.Buffer;
 import java.nio.ByteBuffer;
 import java.nio.MappedByteBuffer;
+import java.nio.channels.ClosedChannelException;
 import java.nio.channels.FileChannel;
 import java.util.ArrayList;
 import java.util.List;
@@ -149,6 +150,7 @@ public class FlexibleIntervalFileObject extends FileObject {
 
 		long startpos = headerend;
 
+		try {
 		fis.getChannel().position(startpos);
 		byte[] b = new byte[(int) (length - headerend)];
 		dis.read(b, 0, b.length);
@@ -166,7 +168,10 @@ public class FlexibleIntervalFileObject extends FileObject {
 				toReturn.add(new SampledValue(DoubleValues.of(d), timestamp, s));
 			}
 		}
-
+		} catch(ClosedChannelException e) {
+			logger.warn("   !! CHANNEL_CLOSED_EXCEPTION for "+dataFile.getPath());
+			return toReturn;
+		}
 		return toReturn;
 	}
 
@@ -247,6 +252,7 @@ public class FlexibleIntervalFileObject extends FileObject {
 		ByteBuffer bb = ByteBuffer.wrap(b);
 		((Buffer) bb).rewind();
 		*/
+		try {
 		final MappedByteBuffer bb = fis.getChannel().map(FileChannel.MapMode.READ_ONLY, startpos, length - headerend);
 		int countOfDataSets = (int) ((length - headerend) / getDataSetSize());
 		long tcand = Long.MIN_VALUE;
@@ -268,6 +274,10 @@ public class FlexibleIntervalFileObject extends FileObject {
 		if (!Double.isNaN(dcand))
 			return new SampledValue(DoubleValues.of(dcand), tcand, qcand);
 		return null;
+		} catch (ClosedChannelException e) {
+			logger.warn("   !! CHANNEL_CLOSED_EXCEPTION(2) for "+dataFile.getPath());
+			return null;
+		}
 	}
 
 	@Override

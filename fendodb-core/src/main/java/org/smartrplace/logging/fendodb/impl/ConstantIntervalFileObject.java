@@ -171,7 +171,7 @@ public class ConstantIntervalFileObject extends FileObject {
 						return new SampledValue(DoubleValues.of(toReturn), timestamp, Quality.getQuality(dis.readByte()));
 					} catch(EOFException e) {
 						System.out.println("Caught EOFException reafing from "+dataFile.getPath());
-						e.printStackTrace();
+						//e.printStackTrace();
 						return null;
 					}
 				}
