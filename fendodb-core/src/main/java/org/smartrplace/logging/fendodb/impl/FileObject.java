@@ -157,18 +157,18 @@ public abstract class FileObject {
 		/*
 		 * Close Output Streams for enabling input.
 		 */
-		if (dos != null) {
+		if (dos != null) synchronized(dos) {
 			cache.invalidate();
 			assert cache.getCache() == null : "Invalidated cache is still alive";
 			dos.flush();
 			dos.close();
 			dos = null;
 		}
-		if (bos != null) {
+		if (bos != null) synchronized(bos) {
 			bos.close();
 			bos = null;
 		}
-		if (fos != null) {
+		if (fos != null) synchronized(fos) {
 			fos.close();
 			fos = null;
 		}

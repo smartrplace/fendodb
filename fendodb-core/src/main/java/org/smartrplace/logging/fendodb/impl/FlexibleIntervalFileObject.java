@@ -24,6 +24,7 @@ import java.nio.MappedByteBuffer;
 import java.nio.channels.ClosedChannelException;
 import java.nio.channels.FileChannel;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 import org.ogema.core.channelmanager.measurements.Quality;
@@ -95,7 +96,7 @@ public class FlexibleIntervalFileObject extends FileObject {
 				((Buffer) bb).position((dataSetCount - 1) * getDataSetSize());
 				long l = bb.getLong();
 				return l;
-			} catch (IOException e) {
+			} catch (IOException | NullPointerException e) {
 				logger.error(e.getMessage(), e);
 				// FIXME return negative value to signalize error? for now simply
 				// return startTimeStamp ...
@@ -153,7 +154,11 @@ public class FlexibleIntervalFileObject extends FileObject {
 		try {
 		fis.getChannel().position(startpos);
 		byte[] b = new byte[(int) (length - headerend)];
-		dis.read(b, 0, b.length);
+		try {
+			dis.read(b, 0, b.length);
+		} catch(IOException e) {
+			return Collections.emptyList();
+		}
 		ByteBuffer bb = ByteBuffer.wrap(b);
 		// casting is a hack to avoid incompatibility when building this on Java 9 and run on Java 8
 		// ByteBuffer#rewind used to return a Buffer in Jdk8, but from Java 9 on returns a ByteBuffer
