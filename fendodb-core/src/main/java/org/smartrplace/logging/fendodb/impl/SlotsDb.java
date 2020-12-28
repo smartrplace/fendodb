@@ -653,6 +653,7 @@ public class SlotsDb implements CloseableDataRecorder {
 			try (ObjectInputStream ois = new ObjectInputStream(Files.newInputStream(slotsDbStoragePath))) {
 				 configurations.putAll((Map<? extends String, ? extends RecordedDataConfiguration>) ois.readObject());
 			} catch (Exception e) {
+				System.out.println("Could not read: "+slotsDbStoragePath);
 				e.printStackTrace();
 			}
 		}
