@@ -904,7 +904,8 @@ public final class FileObjectProxy {
 		List<FileObject> toRead = new ArrayList<>();
 
 		folderLock.readLock().lock();
-		logger.trace("Found startDate:"+strStartDate+" endDate:"+strEndDate);
+		if (logger.isTraceEnabled())
+			logger.trace("Found startDate:"+strStartDate+" endDate:"+strEndDate);
 		try {
 			if (strStartDate != strEndDate) {
 				logger.trace("Reading Multiple Days. Scanning for Folders.");
@@ -928,14 +929,17 @@ public final class FileObjectProxy {
 				toRead.removeAll(Collections.singleton(null));
 			}
 			else { // Start == End Folder -> only 1 FileObjectList must be read.
-				logger.trace("Before getFileObjectList for "+label);
+				if (logger.isTraceEnabled())
+					logger.trace("Before getFileObjectList for "+label);
 				final FileObjectList fol = getFileObjectList(strStartDate, label);
-				logger.trace("FileObjectListSize:"+fol.size());
+				if (logger.isTraceEnabled())
+					logger.trace("FileObjectListSize:"+fol.size());
 				if (fol.size() > 0)
 					toRead.addAll(fol.getFileObjectsFromTo(start, end));
 			}
 		
-			logger.trace("Found " + toRead.size() + " " + SlotsDb.FILE_EXTENSION + " files to read from.");
+			if (logger.isTraceEnabled())
+				logger.trace("Found " + toRead.size() + " " + SlotsDb.FILE_EXTENSION + " files to read from.");
 
 			/*
 			 * Read all FileObjects: first (2nd,3rd,4th....n-1) last first and last will be read separately, to not exceed
