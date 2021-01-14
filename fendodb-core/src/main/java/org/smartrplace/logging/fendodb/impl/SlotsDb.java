@@ -652,6 +652,8 @@ public class SlotsDb implements CloseableDataRecorder {
 				configurations.putAll(configs);
 			} catch (Exception e) {
 				FileObjectProxy.logger.error("Failed to read persisted FendoDb storages", e);
+				System.out.println("Could not read: "+slotsDbStoragePath);
+				e.printStackTrace();
 			}
 		}
 		if (addFolders && path != null) {
