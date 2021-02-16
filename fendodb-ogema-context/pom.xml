@@ -65,7 +65,7 @@
 		<dependency>
 			<groupId>org.smartrplace.logging</groupId>
 			<artifactId>fendodb-admin-api</artifactId>
-			<version>${project.version}</version>
+			<version>0.1.1-SNAPSHOT</version>
 		</dependency>
 		<!-- in repo smartrplace-tools -->
 		<dependency>
@@ -77,7 +77,7 @@
 		<dependency>
 			<groupId>org.smartrplace.logging</groupId>
 			<artifactId>fendodb-rest</artifactId>
-			<version>${project.version}</version>
+			<version>0.1.1-SNAPSHOT</version>
 		</dependency>
 		 <!-- test only dependencies below -->
 		<dependency>
