@@ -9,6 +9,7 @@
 
     <artifactId>fendodb-grafana-server-config</artifactId>
     <name>FendoDB Grafana server configs</name>
+    <version>0.1.1-SNAPSHOT</version>
     <description>FendoDB Grafana configs based on OGEMA tags</description>
 
     <packaging>bundle</packaging>

@@ -9,6 +9,7 @@
 
     <artifactId>fendodb-ogema-context</artifactId>
     <name>FendoDB REST context</name>
+    <version>0.1.1-SNAPSHOT</version>
 
     <description>
 		Servlet context helper for applying OGEMA user administration to FendoDB REST interface

@@ -8,6 +8,7 @@
     </parent>
     
     <artifactId>fendodb-source</artifactId>
+    <version>0.1.1-SNAPSHOT</version>
     <packaging>bundle</packaging>
     <name>FendoDb timeseries source</name>
     <description>FendoDb as source for OGEMA timeseries</description>

@@ -10,6 +10,7 @@
     </parent>
 
 	<artifactId>fendodb-reader</artifactId>
+    <version>0.1.1-SNAPSHOT</version>
 	<name>FendoDB reader</name>
 
 	<packaging>jar</packaging>

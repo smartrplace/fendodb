@@ -10,6 +10,7 @@
     </parent>
 
 	<artifactId>fendodb-viz</artifactId>
+    <version>0.1.1-SNAPSHOT</version>
 	<name>FendoDB vizualisation</name>
 	<description>FendoDB vizualisation, based on OGEMA widgets</description>
 

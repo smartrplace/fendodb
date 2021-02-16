@@ -10,6 +10,7 @@
     </parent>
 
 	<artifactId>fendodb-recordeddata-wrapper</artifactId>
+    <version>0.1.1-SNAPSHOT</version>
 	<name>Wrapper for using fendoDB as logger for OGEMA data</name>
 
 	<packaging>bundle</packaging>

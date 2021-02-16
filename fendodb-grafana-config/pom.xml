@@ -11,6 +11,7 @@
 
     <artifactId>fendodb-grafana-config</artifactId>
     <name>FendoDb Grafana config gui</name>
+    <version>0.1.1-SNAPSHOT</version>
     <description>Config tool for FendoDb's Grafana visualization</description>
 	<packaging>bundle</packaging>
 

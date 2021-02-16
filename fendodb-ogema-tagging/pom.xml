@@ -10,6 +10,7 @@
     </parent>
 
 	<artifactId>fendodb-ogema-tagging</artifactId>
+    <version>0.1.1-SNAPSHOT</version>
 	<name>FendoDb data tagging</name>
 	<description>Tag FendoDb data</description>
 

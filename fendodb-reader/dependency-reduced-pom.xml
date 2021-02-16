@@ -7,7 +7,7 @@
   </parent>
   <modelVersion>4.0.0</modelVersion>
   <artifactId>fendodb-reader</artifactId>
-  <name>SlotsDB timeseries database API</name>
+  <name>FendoDB reader</name>
   <build>
     <plugins>
       <plugin>

@@ -11,6 +11,7 @@
 
     <artifactId>fendodb-grafana</artifactId>
     <name>FendoDb Grafana viz</name>
+    <version>0.1.1-SNAPSHOT</version>
     <description>FendoDb visualisation based on Grafana</description>
 	<packaging>bundle</packaging>
 

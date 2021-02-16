@@ -10,6 +10,7 @@
     </parent>
 
 	<artifactId>fendodb-tools</artifactId>
+    <version>0.1.1-SNAPSHOT</version>
 	<name>Tools for the FendoDB time series database</name>
 
 	<packaging>bundle</packaging>

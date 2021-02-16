@@ -11,6 +11,7 @@
 
     <artifactId>fendodb-influx-connector</artifactId>
     <name>FendoDb influx connector</name>
+    <version>0.1.1-SNAPSHOT</version>
     <description>Exports FendoDb data into InfluxDb</description>
 	<packaging>bundle</packaging>
 
