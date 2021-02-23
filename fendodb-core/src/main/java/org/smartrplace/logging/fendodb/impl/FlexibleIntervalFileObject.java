@@ -283,7 +283,7 @@ public class FlexibleIntervalFileObject extends FileObject {
 		if (!Double.isNaN(dcand))
 			return new SampledValue(DoubleValues.of(dcand), tcand, qcand);
 		return null;
-		} catch (ClosedChannelException e) {
+		} catch (ClosedChannelException e) { // FIXME remove
 			logger.warn("   !! CHANNEL_CLOSED_EXCEPTION(2) for "+dataFile.getPath());
 			return null;
 		}

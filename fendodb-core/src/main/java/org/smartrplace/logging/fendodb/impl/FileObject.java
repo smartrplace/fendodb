@@ -128,6 +128,9 @@ public abstract class FileObject {
 		}
 	}
 
+	/*
+	 * Requires the SlotsDbStorage write lock to be held.
+	 */
 	protected void enableOutput() throws IOException {
 		/*
 		 * Close Input Streams, for enabling output.
@@ -149,10 +152,13 @@ public abstract class FileObject {
 			bos = new BufferedOutputStream(fos);
 			dos = new DataOutputStream(bos);
 		}
-		canRead = false;
 		canWrite = true;
+		canRead = false;
 	}
 
+	/*
+	 * Requires the SlotsDbStorage read lock to be held.
+	 */
 	protected void enableInput() throws IOException {
 		if (canRead)
 			return;
@@ -318,13 +324,12 @@ public abstract class FileObject {
 	public abstract long getStoringPeriod();
 
 	/**
-	 * Closes and Flushes underlying Input- and OutputStreams
+	 * Closes and Flushes underlying Input- and OutputStreams.
+	 * Requires the SlotsDbStorage write lock to be held. 
 	 * 
 	 * @throws IOException
 	 */
 	public void close() throws IOException {
-		canRead = false;
-		canWrite = false;
 		if (dos != null) {
 			cache.invalidate();
 			assert cache.getCache() == null : "Invalidated cache is still alive";
@@ -344,6 +349,8 @@ public abstract class FileObject {
 			fis.close();
 			fis = null;
 		}
+		canRead = false;
+		canWrite = false;
 	}
 
 	/**

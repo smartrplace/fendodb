@@ -949,14 +949,10 @@ public final class FileObjectProxy {
 			if (toRead != null) {
 				if (toRead.size() > 1) {
 					toReturn.addAll(toRead.get(0).read(start, toRead.get(0).getTimestampForLatestValue()));
-					toRead.get(0).close();
 					for (int i = 1; i < toRead.size() - 1; i++) {
 						toReturn.addAll(toRead.get(i).readFully());
-						toRead.get(i).close();
 					}
-					toReturn.addAll(toRead.get(toRead.size() - 1).read(toRead.get(toRead.size() - 1).getStartTimeStamp(),
-							end));
-					toRead.get(toRead.size() - 1).close();
+					toReturn.addAll(toRead.get(toRead.size() - 1).read(toRead.get(toRead.size() - 1).getStartTimeStamp(), end));
 	
 					/*
 					 * Some Values might be null -> remove
