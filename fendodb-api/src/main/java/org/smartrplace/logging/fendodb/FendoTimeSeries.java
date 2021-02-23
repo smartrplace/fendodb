@@ -81,4 +81,7 @@ public interface FendoTimeSeries extends RecordedDataStorage {
 		return StreamSupport.stream(iterable.spliterator(), false);
 	};
 
+	default boolean isReadOnly() {
+		return true;
+	}
 }

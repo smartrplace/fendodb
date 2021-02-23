@@ -116,7 +116,11 @@ public class FlexibleIntervalFileObject extends FileObject {
 
 		long startpos = headerend;
 
-		fis.getChannel().position(startpos);
+		try {
+			fis.getChannel().position(startpos);
+		} catch(ClosedChannelException e) {
+			return Collections.emptyList();
+		}
 		byte[] b = new byte[(int) (length - headerend)];
 		dis.read(b, 0, b.length);
 		ByteBuffer bb = ByteBuffer.wrap(b);

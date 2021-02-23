@@ -232,5 +232,10 @@ class SlotsDbStorageProxy implements FendoTimeSeries {
 		return "SlotsDbStorageProxy[" + master.toString() + "]";
 	}
 	
+	@Override
+	public boolean isReadOnly() {
+		return readOnly;
+	}
+	
 }
  
