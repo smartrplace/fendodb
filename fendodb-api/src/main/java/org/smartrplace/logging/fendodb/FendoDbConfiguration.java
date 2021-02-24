@@ -36,6 +36,7 @@ public class FendoDbConfiguration implements Serializable {
 	private final long reloadDaysInterval;
 	private final TemporalUnit unit;
 	private final boolean useCompatibilityMode;
+	private final boolean cacheDisabled;
 
 	/*
 	 * Minimum Size for SLOTSDB (in MB).
@@ -77,7 +78,7 @@ public class FendoDbConfiguration implements Serializable {
 	 */
 	@Deprecated
 	public FendoDbConfiguration(boolean readFolders, int maxOpenFolders, long flushPeriodMs, int dataLifetimeDays, int maxDbSizeMB, long dataExpirationCheckItvMs) {
-		this(false, readFolders, maxOpenFolders, flushPeriodMs, dataLifetimeDays, maxDbSizeMB, dataExpirationCheckItvMs, 0, ChronoUnit.DAYS, false);
+		this(false, readFolders, maxOpenFolders, flushPeriodMs, dataLifetimeDays, maxDbSizeMB, dataExpirationCheckItvMs, 0, ChronoUnit.DAYS, false, false);
 	}
 
 	FendoDbConfiguration(
@@ -90,7 +91,8 @@ public class FendoDbConfiguration implements Serializable {
 			long dataExpirationCheckItvMs,
 			long reloadDaysInterval,
 			TemporalUnit unit,
-			boolean useCompatibilityMode) {
+			boolean useCompatibilityMode,
+			boolean cacheDisabled) {
 		this.readOnlyMode = readOnlyMode;
 		if (maxOpenFolders <= 0)
 			throw new IllegalArgumentException("MaxOpenFolders must be a positive number");
@@ -110,6 +112,7 @@ public class FendoDbConfiguration implements Serializable {
 		this.reloadDaysInterval = reloadDaysInterval;
 		if (useCompatibilityMode && !unit.equals(ChronoUnit.DAYS))
 			throw new IllegalArgumentException("Temporal unit " + unit + " cannot be used in compatibility mode; requires DAYS.");
+		this.cacheDisabled = cacheDisabled;
 	}
 	
 
@@ -171,6 +174,10 @@ public class FendoDbConfiguration implements Serializable {
 	
 	public boolean isReadOnlyMode() {
 		return readOnlyMode;
+	}
+	
+	public boolean isCacheDisabled() {
+		return cacheDisabled;
 	}
 	
 	@Override

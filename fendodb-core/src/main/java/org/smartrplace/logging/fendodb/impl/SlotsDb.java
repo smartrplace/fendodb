@@ -640,7 +640,6 @@ public class SlotsDb implements CloseableDataRecorder {
 	 * Read back previously persisted SlotsDbStorage objects
 	 * @throws IOException
 	 */
-	@SuppressWarnings("unchecked")
 	private final Map<String, SlotsDbStorage> readPersistedSlotsDbStorages(final boolean addFolders) throws IOException {
 
 //		final File configFile = new File(slotsDbStoragePath);

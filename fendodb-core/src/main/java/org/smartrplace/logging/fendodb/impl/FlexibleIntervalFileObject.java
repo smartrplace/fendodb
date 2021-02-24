@@ -21,27 +21,25 @@ import java.io.IOException;
 import java.nio.Buffer;
 import java.nio.ByteBuffer;
 import java.nio.MappedByteBuffer;
-import java.nio.channels.ClosedChannelException;
 import java.nio.channels.FileChannel;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 
 import org.ogema.core.channelmanager.measurements.Quality;
 import org.ogema.core.channelmanager.measurements.SampledValue;
-import org.smartrplace.logging.fendodb.impl.SlotsDbCache.RecordedDataCache;
+import org.smartrplace.logging.fendodb.impl.FendoCache.FendoInstanceCache;
 
 public class FlexibleIntervalFileObject extends FileObject {
 
 	private long lastTimestamp;
 	private static final long headerend = 16;
 
-	protected FlexibleIntervalFileObject(File file, RecordedDataCache cache) throws IOException {
+	protected FlexibleIntervalFileObject(File file, FendoInstanceCache cache) throws IOException {
 		super(file, cache);
 		lastTimestamp = startTimeStamp;
 	}
 
-	protected FlexibleIntervalFileObject(String fileName, RecordedDataCache cache) throws IOException {
+	protected FlexibleIntervalFileObject(String fileName, FendoInstanceCache cache) throws IOException {
 		super(fileName, cache);
 		lastTimestamp = startTimeStamp;
 	}
@@ -87,9 +85,11 @@ public class FlexibleIntervalFileObject extends FileObject {
 				if (!canRead) {
 					enableInput();
 				}
-				fis.getChannel().position(headerend);
-				byte[] b = new byte[(int) (length - headerend)];
-				dis.read(b, 0, b.length);
+				final byte[] b = new byte[(int) (length - headerend)];
+				synchronized (this) {
+					fis.getChannel().position(headerend);
+					dis.read(b, 0, b.length);
+				}
 				ByteBuffer bb = ByteBuffer.wrap(b);
 				// set position to last entries timestamp (Long, Double and Byte size in bits
 				// so divide through Byte.SIZE to get size in bytes)
@@ -115,14 +115,11 @@ public class FlexibleIntervalFileObject extends FileObject {
 		}
 
 		long startpos = headerend;
-
-		try {
+		final byte[] b = new byte[(int) (length - headerend)];
+		synchronized (this) {
 			fis.getChannel().position(startpos);
-		} catch(ClosedChannelException e) {
-			return Collections.emptyList();
+			dis.read(b, 0, b.length);
 		}
-		byte[] b = new byte[(int) (length - headerend)];
-		dis.read(b, 0, b.length);
 		ByteBuffer bb = ByteBuffer.wrap(b);
 		// casting is a hack to avoid incompatibility when building this on Java 9 and run on Java 8
 		// ByteBuffer#rewind used to return a Buffer in Jdk8, but from Java 9 on returns a ByteBuffer
@@ -148,26 +145,20 @@ public class FlexibleIntervalFileObject extends FileObject {
 	protected List<SampledValue> readFullyInternal() throws IOException {
 //		List<SampledValue> toReturn = new Vector<SampledValue>();
 		final List<SampledValue> toReturn = new ArrayList<>(getDataSetCountInternal());
-
 		if (!canRead) {
 			enableInput();
 		}
-
 		long startpos = headerend;
-
-		try {
-		fis.getChannel().position(startpos);
-		byte[] b = new byte[(int) (length - headerend)];
-		try {
+		final byte[] b = new byte[(int) (length - headerend)];
+		synchronized (this) {
+			fis.getChannel().position(startpos);
 			dis.read(b, 0, b.length);
-		} catch(IOException e) {
-			return Collections.emptyList();
-		}
+		} 
 		ByteBuffer bb = ByteBuffer.wrap(b);
 		// casting is a hack to avoid incompatibility when building this on Java 9 and run on Java 8
 		// ByteBuffer#rewind used to return a Buffer in Jdk8, but from Java 9 on returns a ByteBuffer
 		((Buffer) bb).rewind();
-		int countOfDataSets = (int) ((length - headerend) / getDataSetSize());
+		final int countOfDataSets = getDataSetCountInternal();
 		for (int i = 0; i < countOfDataSets; i++) {
 			long timestamp = bb.getLong();
 			double d = bb.getDouble();
@@ -176,10 +167,6 @@ public class FlexibleIntervalFileObject extends FileObject {
 			if (!Double.isNaN(d)) {
 				toReturn.add(new SampledValue(DoubleValues.of(d), timestamp, s));
 			}
-		}
-		} catch(ClosedChannelException e) {
-			logger.warn("   !! CHANNEL_CLOSED_EXCEPTION for "+dataFile.getPath());
-			return toReturn;
 		}
 		return toReturn;
 	}
@@ -192,15 +179,16 @@ public class FlexibleIntervalFileObject extends FileObject {
 		}
 
 		long startpos = headerend;
-
-		fis.getChannel().position(startpos);
-		byte[] b = new byte[(int) (length - headerend)];
-		dis.read(b, 0, b.length);
+		final byte[] b = new byte[(int) (length - headerend)];
+		synchronized (this) {
+			fis.getChannel().position(startpos);
+			dis.read(b, 0, b.length);
+		}
 		ByteBuffer bb = ByteBuffer.wrap(b);
 		// casting is a hack to avoid incompatibility when building this on Java 9 and run on Java 8
 		// ByteBuffer#rewind used to return a Buffer in Jdk8, but from Java 9 on returns a ByteBuffer
 		((Buffer) bb).rewind();
-		int countOfDataSets = (int) ((length - headerend) / 17);
+		final int countOfDataSets = getDataSetCountInternal();
 		for (int i = 0; i < countOfDataSets; i++) {
 			long timestamp2 = bb.getLong();
 			double d = bb.getDouble();
@@ -225,17 +213,17 @@ public class FlexibleIntervalFileObject extends FileObject {
 		if (!canRead) {
 			enableInput();
 		}
-
 		long startpos = headerend;
-
-		fis.getChannel().position(startpos);
-		byte[] b = new byte[(int) (length - headerend)];
-		dis.read(b, 0, b.length);
+		final byte[] b = new byte[(int) (length - headerend)];
+		synchronized (this) {
+			fis.getChannel().position(startpos);
+			dis.read(b, 0, b.length);
+		}
 		ByteBuffer bb = ByteBuffer.wrap(b);
 		// casting is a hack to avoid incompatibility when building this on Java 9 and run on Java 8
 		// ByteBuffer#rewind used to return a Buffer in Jdk8, but from Java 9 on returns a ByteBuffer
 		((Buffer) bb).rewind();
-		int countOfDataSets = (int) ((length - headerend) / getDataSetSize());
+		final int countOfDataSets = getDataSetCountInternal();
 		for (int i = 0; i < countOfDataSets; i++) {
 			long timestamp2 = bb.getLong();
 			double d = bb.getDouble();
@@ -261,32 +249,29 @@ public class FlexibleIntervalFileObject extends FileObject {
 		ByteBuffer bb = ByteBuffer.wrap(b);
 		((Buffer) bb).rewind();
 		*/
-		try {
-		final MappedByteBuffer bb = fis.getChannel().map(FileChannel.MapMode.READ_ONLY, startpos, length - headerend);
-		int countOfDataSets = (int) ((length - headerend) / getDataSetSize());
-		long tcand = Long.MIN_VALUE;
-		double dcand = Double.NaN;
-		Quality qcand = null;
-		for (int i = 0; i < countOfDataSets; i++) {
-			long timestamp2 = bb.getLong();
-			double d = bb.getDouble();
-			Quality s = Quality.getQuality(bb.get());
-			if (!Double.isNaN(d) && timestamp >= timestamp2) {
-				tcand = timestamp2;
-				dcand = d;
-				qcand = s;
-//				candidate = new SampledValue(DoubleValues.of(d), timestamp2, s);
+		synchronized (this) {
+			final MappedByteBuffer bb = fis.getChannel().map(FileChannel.MapMode.READ_ONLY, startpos, length - headerend);
+			final int countOfDataSets = getDataSetCountInternal();
+			long tcand = Long.MIN_VALUE;
+			double dcand = Double.NaN;
+			Quality qcand = null;
+			for (int i = 0; i < countOfDataSets; i++) {
+				long timestamp2 = bb.getLong();
+				double d = bb.getDouble();
+				Quality s = Quality.getQuality(bb.get());
+				if (!Double.isNaN(d) && timestamp >= timestamp2) {
+					tcand = timestamp2;
+					dcand = d;
+					qcand = s;
+	//				candidate = new SampledValue(DoubleValues.of(d), timestamp2, s);
+				}
+				else if (timestamp < timestamp2)
+					break;
 			}
-			else if (timestamp < timestamp2)
-				break;
+			if (!Double.isNaN(dcand))
+				return new SampledValue(DoubleValues.of(dcand), tcand, qcand);
 		}
-		if (!Double.isNaN(dcand))
-			return new SampledValue(DoubleValues.of(dcand), tcand, qcand);
 		return null;
-		} catch (ClosedChannelException e) { // FIXME remove
-			logger.warn("   !! CHANNEL_CLOSED_EXCEPTION(2) for "+dataFile.getPath());
-			return null;
-		}
 	}
 
 	@Override
@@ -305,15 +290,17 @@ public class FlexibleIntervalFileObject extends FileObject {
 			enableInput();
 		}
 		long startpos = headerend;
-		fis.getChannel().position(startpos);
-		byte[] b = new byte[(int) (length - headerend)];
-		dis.read(b, 0, b.length);
+		final byte[] b = new byte[(int) (length - headerend)];
+		synchronized (this) {
+			fis.getChannel().position(startpos);
+			dis.read(b, 0, b.length);
+		}
 		ByteBuffer bb = ByteBuffer.wrap(b);
 		// casting is a hack to avoid incompatibility when building this on Java 9 and run on Java 8
 		// ByteBuffer#rewind used to return a Buffer in Jdk8, but from Java 9 on returns a ByteBuffer
 		((Buffer) bb).rewind();
 		int cnt = 0;
-		int countOfDataSets = getDataSetCountInternal();
+		final int countOfDataSets = getDataSetCountInternal();
 		for (int i = 0; i < countOfDataSets; i++) {
 			long timestamp2 = bb.getLong();
 			double d = bb.getDouble();

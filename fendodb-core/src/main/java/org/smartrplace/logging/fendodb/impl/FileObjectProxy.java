@@ -96,7 +96,7 @@ public final class FileObjectProxy {
 	private final long dataExpirationCheckInterval;
 	private final boolean readFolders;
 	
-	private final SlotsDbCache cache = new SlotsDbCache();
+	private final FendoCache cache;
 
 	/**
 	 * Creates an instance of a FileObjectProxy<br>
@@ -107,6 +107,7 @@ public final class FileObjectProxy {
 	 * @throws IOException
 	 */
 	public FileObjectProxy(Path rootNodePath, FrameworkClock clock, FendoDbConfiguration config) throws IOException {
+		this.cache = config.isCacheDisabled() ? FendoCache.noopCache() : new SlotsDbCache();
 		this.useCompatibilityMode = config.useCompatibilityMode();
 		this.unit = useCompatibilityMode ? ChronoUnit.DAYS : config.getFolderCreationTimeUnit();
 		this.readOnlyMode = config.isReadOnlyMode();
