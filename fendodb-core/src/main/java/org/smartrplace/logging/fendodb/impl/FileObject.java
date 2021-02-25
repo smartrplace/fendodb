@@ -29,7 +29,7 @@ import java.util.List;
 import org.ogema.core.channelmanager.measurements.SampledValue;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.smartrplace.logging.fendodb.impl.SlotsDbCache.RecordedDataCache;
+import org.smartrplace.logging.fendodb.impl.FendoCache.FendoInstanceCache;
 
 public abstract class FileObject {
 
@@ -45,14 +45,14 @@ public abstract class FileObject {
 	protected boolean canWrite;
 	protected volatile boolean canRead;
 	
-	private final RecordedDataCache cache;
+	private final FendoInstanceCache cache;
 
 	/*
 	 * File length will be cached to avoid system calls and improve I/O Performance
 	 */
 	protected long length = 0;
 
-	public FileObject(String filename, RecordedDataCache cache) throws IOException {
+	public FileObject(String filename, FendoInstanceCache cache) throws IOException {
 		this.cache = cache;
 		canWrite = false;
 		canRead = false;
@@ -67,14 +67,7 @@ public abstract class FileObject {
 				fis = new FileInputStream(dataFile);
 				try {
 					dis = new DataInputStream(fis);
-					try {
-						readHeader(dis);
-					} finally {
-						if (dis != null) {
-							dis.close();
-							dis = null;
-						}
-					}
+					readHeader(dis);
 				} finally {
 					if (dis != null) {
 						dis.close();
@@ -97,7 +90,7 @@ public abstract class FileObject {
 	 */
 	abstract void readHeader(DataInputStream dis) throws IOException;
 
-	public FileObject(File file, RecordedDataCache cache) throws IOException {
+	public FileObject(File file, FendoInstanceCache cache) throws IOException {
 		this.cache = cache;
 		canWrite = false;
 		canRead = false;
@@ -128,6 +121,9 @@ public abstract class FileObject {
 		}
 	}
 
+	/*
+	 * Requires the SlotsDbStorage write lock to be held.
+	 */
 	protected void enableOutput() throws IOException {
 		/*
 		 * Close Input Streams, for enabling output.
@@ -149,10 +145,13 @@ public abstract class FileObject {
 			bos = new BufferedOutputStream(fos);
 			dos = new DataOutputStream(bos);
 		}
-		canRead = false;
 		canWrite = true;
+		canRead = false;
 	}
 
+	/*
+	 * Requires the SlotsDbStorage read lock to be held.
+	 */
 	protected void enableInput() throws IOException {
 		if (canRead)
 			return;
@@ -318,13 +317,12 @@ public abstract class FileObject {
 	public abstract long getStoringPeriod();
 
 	/**
-	 * Closes and Flushes underlying Input- and OutputStreams
+	 * Closes and Flushes underlying Input- and OutputStreams.
+	 * Requires the SlotsDbStorage write lock to be held. 
 	 * 
 	 * @throws IOException
 	 */
 	public void close() throws IOException {
-		canRead = false;
-		canWrite = false;
 		if (dos != null) {
 			cache.invalidate();
 			assert cache.getCache() == null : "Invalidated cache is still alive";
@@ -344,6 +342,8 @@ public abstract class FileObject {
 			fis.close();
 			fis = null;
 		}
+		canRead = false;
+		canWrite = false;
 	}
 
 	/**
@@ -366,7 +366,7 @@ public abstract class FileObject {
 		return startTimeStamp;
 	}
 
-	public static FileObject getFileObject(String fileName, RecordedDataCache cache) throws IOException {
+	public static FileObject getFileObject(String fileName, FendoInstanceCache cache) throws IOException {
 		if (fileName.startsWith("c")) {
 			return new ConstantIntervalFileObject(fileName, cache);
 		}
@@ -378,7 +378,7 @@ public abstract class FileObject {
 		}
 	}
 
-	public static FileObject getFileObject(File file, RecordedDataCache cache) throws IOException {
+	public static FileObject getFileObject(File file, FendoInstanceCache cache) throws IOException {
 		if (file.getName().startsWith("c")) {
 			return new ConstantIntervalFileObject(file, cache);
 		}

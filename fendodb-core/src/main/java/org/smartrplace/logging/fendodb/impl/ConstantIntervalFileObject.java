@@ -27,15 +27,15 @@ import java.util.List;
 
 import org.ogema.core.channelmanager.measurements.Quality;
 import org.ogema.core.channelmanager.measurements.SampledValue;
-import org.smartrplace.logging.fendodb.impl.SlotsDbCache.RecordedDataCache;
+import org.smartrplace.logging.fendodb.impl.FendoCache.FendoInstanceCache;
 
 public class ConstantIntervalFileObject extends FileObject {
 
-	protected ConstantIntervalFileObject(File file, RecordedDataCache cache) throws IOException {
+	protected ConstantIntervalFileObject(File file, FendoInstanceCache cache) throws IOException {
 		super(file, cache);
 	}
 
-	protected ConstantIntervalFileObject(String fileName, RecordedDataCache cache) throws IOException {
+	protected ConstantIntervalFileObject(String fileName, FendoInstanceCache cache) throws IOException {
 		super(fileName, cache);
 	}
 
@@ -164,15 +164,16 @@ public class ConstantIntervalFileObject extends FileObject {
 				if (!canRead) {
 					enableInput();
 				}
-				fis.getChannel().position(getBytePosition(timestamp));
-				Double toReturn = dis.readDouble();
-				if (!Double.isNaN(toReturn)) {
-					try {
-						return new SampledValue(DoubleValues.of(toReturn), timestamp, Quality.getQuality(dis.readByte()));
-					} catch(EOFException e) {
-						System.out.println("Caught EOFException reafing from "+dataFile.getPath());
-						//e.printStackTrace();
-						return null;
+				synchronized (this) {
+					fis.getChannel().position(getBytePosition(timestamp));
+					Double toReturn = dis.readDouble();
+					if (!Double.isNaN(toReturn)) {
+						try {
+							return new SampledValue(DoubleValues.of(toReturn), timestamp, Quality.getQuality(dis.readByte()));
+						} catch(EOFException e) {
+							logger.error("Caught EOFException reading from {}", dataFile.getPath(), e);
+							return null;
+						}
 					}
 				}
 			}
@@ -213,11 +214,11 @@ public class ConstantIntervalFileObject extends FileObject {
 			long timestampcounter = start;
 			long startPos = getBytePosition(start);
 			long endPos = getBytePosition(endRounded);
-
-			fis.getChannel().position(startPos);
-
-			byte[] b = new byte[(int) (endPos - startPos) + 9];
-			dis.read(b, 0, b.length);
+			final byte[] b = new byte[(int) (endPos - startPos) + 9];
+			synchronized (this) {
+				fis.getChannel().position(startPos);
+				dis.read(b, 0, b.length);
+			}
 			ByteBuffer bb = ByteBuffer.wrap(b);
 			// casting is a hack to avoid incompatibility when building this on Java 9 and run on Java 8
 			// ByteBuffer#rewind used to return a Buffer in Jdk8, but from Java 9 on returns a ByteBuffer
@@ -259,10 +260,12 @@ public class ConstantIntervalFileObject extends FileObject {
 				if (!canRead) {
 					enableInput();
 				}
-				fis.getChannel().position(getBytePosition(timestamp));
-				Double toReturn = dis.readDouble();
-				if (!Double.isNaN(toReturn)) {
-					return new SampledValue(DoubleValues.of(toReturn), timestamp, Quality.getQuality(dis.readByte()));
+				synchronized (this) {
+					fis.getChannel().position(getBytePosition(timestamp));
+					Double toReturn = dis.readDouble();
+					if (!Double.isNaN(toReturn)) {
+						return new SampledValue(DoubleValues.of(toReturn), timestamp, Quality.getQuality(dis.readByte()));
+					}
 				}
 				timestamp += storagePeriod;
 			}
@@ -276,16 +279,17 @@ public class ConstantIntervalFileObject extends FileObject {
 		timestamp = timestamp + (storagePeriod - ((timestamp - startTimeStamp) % storagePeriod)); // what if storagePeriod changes?
 		long startPos = getBytePosition(startTimeStamp);
 		long endPos = getBytePosition(timestamp);
-
 		for (int i = 0; i <= (endPos - startPos) / 9; i++) {
 			if (timestamp >= startTimeStamp && timestamp <= getTimestampForLatestValueInternal()) {
 				if (!canRead) {
 					enableInput();
 				}
-				fis.getChannel().position(getBytePosition(timestamp));
-				Double toReturn = dis.readDouble();
-				if (!Double.isNaN(toReturn)) {
-					return new SampledValue(DoubleValues.of(toReturn), timestamp, Quality.getQuality(dis.readByte()));
+				synchronized (this) {
+					fis.getChannel().position(getBytePosition(timestamp));
+					Double toReturn = dis.readDouble();
+					if (!Double.isNaN(toReturn)) {
+						return new SampledValue(DoubleValues.of(toReturn), timestamp, Quality.getQuality(dis.readByte()));
+					}
 				}
 				timestamp -= storagePeriod;
 			}

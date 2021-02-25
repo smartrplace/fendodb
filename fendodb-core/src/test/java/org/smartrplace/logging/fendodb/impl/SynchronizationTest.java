@@ -23,6 +23,8 @@ import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Spliterator;
+import java.util.Spliterators;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
@@ -30,14 +32,20 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Function;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
+import java.util.stream.StreamSupport;
 
 import org.apache.commons.io.FileUtils;
 import org.junit.Assert;
 import org.junit.Assume;
 import org.junit.Test;
 import org.ogema.core.channelmanager.measurements.FloatValue;
+import org.ogema.core.channelmanager.measurements.IntegerValue;
 import org.ogema.core.channelmanager.measurements.Quality;
 import org.ogema.core.channelmanager.measurements.SampledValue;
 import org.ogema.core.recordeddata.RecordedDataConfiguration;
@@ -53,6 +61,15 @@ public class SynchronizationTest extends FactoryTest {
 
 	private static final int SLOTS_PER_DAY = 1000;
 	private final static boolean ignore = "true".equalsIgnoreCase(System.getenv("NO_LONG_TESTS")) || Boolean.getBoolean("NO_LONG_TESTS");
+	private static final AtomicInteger CNT = new AtomicInteger(0);
+	private static final RecordedDataConfiguration FLEXIBLE_CFG = new RecordedDataConfiguration();
+	private static final RecordedDataConfiguration CONSTANT_CFG = new RecordedDataConfiguration();	
+	
+	static {
+		FLEXIBLE_CFG.setStorageType(StorageType.ON_VALUE_UPDATE);
+		CONSTANT_CFG.setStorageType(StorageType.FIXED_INTERVAL);
+		CONSTANT_CFG.setFixedInterval(10);
+	}
 
 
 	private static RecordedDataConfiguration getConfig(int i) {
@@ -119,7 +136,6 @@ public class SynchronizationTest extends FactoryTest {
 			}
 		}
 	}
-
 
 	@Test
 	public void multipleLogsWorkInParallelImmediateFlush() throws Throwable {
@@ -328,6 +344,117 @@ public class SynchronizationTest extends FactoryTest {
 		}
 
 	}
+	
+	private void concurrentReadsWork(
+			RecordedDataConfiguration config,
+			Function<RecordedDataStorage, List<SampledValue>> reader
+				) throws IOException, DataRecorderException, InterruptedException, ExecutionException, TimeoutException {
+		// before the fix this used to fail occasionally at nrDatapoints=1000 and reproducibly at nrDatapoints=10000 on my computer
+		this.concurrentReadsWork(config, reader, 10000);
+	}
+	
+	private void concurrentReadsWork(
+				RecordedDataConfiguration config,
+				Function<RecordedDataStorage, List<SampledValue>> reader,
+				int nrDatapoints
+					) throws IOException, DataRecorderException, InterruptedException, ExecutionException, TimeoutException {
+		final int readerThreads = 10;
+		final FendoDbConfiguration fendoConfig = FendoDbConfigurationBuilder.getInstance()
+			.setCacheDisabled(true)
+			.setFlushPeriod(0)
+			.build();
+		final ExecutorService e = Executors.newFixedThreadPool(readerThreads);
+		try (final CloseableDataRecorder instance = factory.getInstance(Paths.get(SlotsDb.DB_TEST_ROOT_FOLDER), fendoConfig)) {
+			final RecordedDataStorage ts = instance.createRecordedDataStorage("concurrentReadTest" + CNT.getAndIncrement(), config);
+			final List<Integer> expectedValues = IntStream.range(0, nrDatapoints)
+					.mapToObj(Integer::valueOf)
+					.collect(Collectors.toList());
+			final List<SampledValue> values = IntStream.range(0, nrDatapoints)
+				.mapToObj(i -> new SampledValue(new IntegerValue(expectedValues.get(i)), 20 * i + Math.round(Math.random()*4 - 2) , Quality.GOOD))
+				.collect(Collectors.toList());
+			ts.insertValues(values);
+			final CountDownLatch threadsReady = new CountDownLatch(readerThreads);
+			final CountDownLatch startLatch = new CountDownLatch(1);
+			final Callable<List<Integer>> constTask = () -> {
+				threadsReady.countDown();
+				Assert.assertTrue("No start signal received", startLatch.await(15, TimeUnit.SECONDS));
+				return reader.apply(ts).stream()
+					.map(v -> v.getValue().getIntegerValue())
+					.collect(Collectors.toList());
+			};	
+			final List<Future<List<Integer>>> results = IntStream.range(0, readerThreads)
+				.mapToObj(i -> e.submit(constTask))
+				.collect(Collectors.toList());
+			Assert.assertTrue("Reader threads not ready", threadsReady.await(15, TimeUnit.SECONDS));
+			startLatch.countDown();
+			for (Future<List<Integer>> result: results) {
+				final List<Integer> valuesResult = result.get(30, TimeUnit.SECONDS);
+				Assert.assertTrue("Unexpected result " + valuesResult + ", expected " + expectedValues, expectedValues.equals(valuesResult));
+			}
+		} finally {
+			e.shutdownNow();
+		}
+	}
 
+	@Test
+	public void concurrentReadsWorkFlex() throws IOException, DataRecorderException, InterruptedException, ExecutionException, TimeoutException {
+		this.concurrentReadsWork(FLEXIBLE_CFG, ts -> ts.getValues(Long.MIN_VALUE));
+	}
+	
+	@Test
+	public void concurrentReadsWorkFlexIterator() throws IOException, DataRecorderException, InterruptedException, ExecutionException, TimeoutException {
+		final Function<RecordedDataStorage, List<SampledValue>>  reader = ts -> 
+			StreamSupport.stream(Spliterators.spliteratorUnknownSize(ts.iterator(), Spliterator.ORDERED), false).collect(Collectors.toList());
+		this.concurrentReadsWork(FLEXIBLE_CFG, reader);
+	}
+	
+	@Test
+	public void concurrentReadsWorkFlexNext() throws IOException, DataRecorderException, InterruptedException, ExecutionException, TimeoutException {
+		final Function<RecordedDataStorage, List<SampledValue>>  reader = ts -> {
+			long t= Long.MIN_VALUE;
+			final List<SampledValue> values = new ArrayList<>();
+			while (true) {
+				final SampledValue sv = ts.getNextValue(t);
+				if (sv == null)
+					break;
+				values.add(sv);
+				t = sv.getTimestamp() + 1;
+			}
+			return values;
+		};
+		this.concurrentReadsWork(FLEXIBLE_CFG, reader, 1000);
+	}
+	
+
+	@Test
+	public void concurrentReadsWorkConst() throws IOException, DataRecorderException, InterruptedException, ExecutionException, TimeoutException {
+		this.concurrentReadsWork(CONSTANT_CFG, ts -> ts.getValues(Long.MIN_VALUE));
+	}
+	
+	@Test
+	public void concurrentReadsWorkConstIterator() throws IOException, DataRecorderException, InterruptedException, ExecutionException, TimeoutException {
+		final Function<RecordedDataStorage, List<SampledValue>>  reader = ts -> 
+			StreamSupport.stream(Spliterators.spliteratorUnknownSize(ts.iterator(), Spliterator.ORDERED), false).collect(Collectors.toList());
+		this.concurrentReadsWork(CONSTANT_CFG, reader);
+	}
+	
+	@Test
+	public void concurrentReadsWorkConstNext() throws IOException, DataRecorderException, InterruptedException, ExecutionException, TimeoutException {
+		final Function<RecordedDataStorage, List<SampledValue>>  reader = ts -> {
+			long t= Long.MIN_VALUE;
+			final List<SampledValue> values = new ArrayList<>();
+			while (true) {
+				final SampledValue sv = ts.getNextValue(t);
+				if (sv == null)
+					break;
+				values.add(sv);
+				t = sv.getTimestamp() + 1;
+			}
+			return values;
+		};
+		this.concurrentReadsWork(CONSTANT_CFG, reader, 1000);
+	}
+	
+	
 
 }

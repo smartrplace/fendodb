@@ -22,7 +22,7 @@ import org.ogema.core.channelmanager.measurements.SampledValue;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 
-class SlotsDbCache {
+class SlotsDbCache implements FendoCache {
 
 	/*
 	 *Map< encoded recorded data id + "/" + filename -> values>
@@ -41,18 +41,20 @@ class SlotsDbCache {
 		return valueCache.getIfPresent(accessToken);
 	}
 
-	final RecordedDataCache getCache(String encodedRecordedData, String filename) {
+	@Override
+	public final RecordedDataCache getCache(String encodedRecordedData, String filename) {
 		return new RecordedDataCache(encodedRecordedData, filename);
 	}
 
-	void clearCache() {
+	@Override
+	public void clearCache() {
 		valueCache.invalidateAll();
 	}
 
 	/**
 	 * One instance per FileObject
 	 */
-	final class RecordedDataCache {
+	final class RecordedDataCache implements FendoInstanceCache {
 
 		private final String key;
 
@@ -62,15 +64,18 @@ class SlotsDbCache {
 			this.key = recordedDataId + "/" + file;
 		}
 
-		void cache(List<SampledValue> values) {
+		@Override
+		public void cache(List<SampledValue> values) {
 			SlotsDbCache.this.cache(key, values);
 		}
 
-		void invalidate() {
+		@Override
+		public void invalidate() {
 			SlotsDbCache.this.invalidate(key);
 		}
 
-		List<SampledValue> getCache() {
+		@Override
+		public List<SampledValue> getCache() {
 			return SlotsDbCache.this.getCache(key);
 		}
 

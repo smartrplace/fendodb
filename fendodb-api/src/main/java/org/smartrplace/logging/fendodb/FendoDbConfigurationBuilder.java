@@ -29,6 +29,7 @@ public class FendoDbConfigurationBuilder {
 	final static int DEFAULT_MAX_DATABASE_SIZE; // 0 (unrestricted)
 	final static long DEFAULT_DATA_EXPIRATION_CHECK_INTERVAL; // = 24 * 60 * 60 * 1000; // 1d
 	final static long DEFAULT_RELOAD_DAYS_INTERVAL; // = 0 // disabled
+	final static boolean DEFAULT_CACHE_DISABLED;
 
 	static {
 		// BundleContext; avoid explicit class usage, to avoid NoClassDefFoundError when used without OSGi
@@ -43,6 +44,7 @@ public class FendoDbConfigurationBuilder {
 		DEFAULT_MAX_DATABASE_SIZE = getIntValue(ctx, "org.smartrplace.logging.fendo.limit_size", 0, 0);
 		DEFAULT_DATA_EXPIRATION_CHECK_INTERVAL = getLongValue(ctx, "org.smartrplace.logging.fendo.scanning_interval", 24 * 60 * 60 * 1000, 5 * 60 * 1000);
 		DEFAULT_RELOAD_DAYS_INTERVAL = getLongValue(ctx, "org.smartrplace.logging.fendo.reloaddays_interval", 0L, 0L);
+		DEFAULT_CACHE_DISABLED = "true".equalsIgnoreCase(getProperty(ctx, "org.smartrplace.logging.fendo.cache_disabled"));
 	}
 
 	private final static int getIntValue(final Object ctx, final String property, final int defaultVal, final int minValue) {
@@ -68,31 +70,6 @@ public class FendoDbConfigurationBuilder {
 		}
 		return defaultVal;
 	}
-
-//	private final static long getLongValue(
-//			final BundleContext ctx,
-//			final String property,
-//			final String propertySeconds,
-//			final long defaultVal,
-//			final long minValue) {
-//		final String val = getProperty(ctx, property);
-//		if (val != null) {
-//			try {
-//				final long value = Long.parseLong(val);
-//				if (value >= minValue)
-//					return value;
-//			} catch (NumberFormatException ok) {}
-//		}
-//		final String valSeconds = getProperty(ctx, propertySeconds);
-//		if (valSeconds != null) {
-//			try {
-//				final long value = Long.parseLong(valSeconds) * 1000;
-//				if (value >= minValue)
-//					return value;
-//			} catch (NumberFormatException ok) {}
-//		}
-//		return defaultVal;
-//	}
 
 	private final static String getProperty(final Object ctx, final String property) {
 		return AccessController.doPrivileged(new PrivilegedAction<String>() {
@@ -151,6 +128,8 @@ public class FendoDbConfigurationBuilder {
 	private boolean useCompatibilityMode = false;
 
 	private boolean readOnlyMode = false;
+	
+	private boolean cacheDisabled = DEFAULT_CACHE_DISABLED;
 
 	private FendoDbConfigurationBuilder() {}
 
@@ -179,7 +158,8 @@ public class FendoDbConfigurationBuilder {
 			.setReadOnlyMode(copyConfig.isReadOnlyMode())
 			.setTemporalUnit(copyConfig.getFolderCreationTimeUnit())
 			.setUseCompatibilityMode(copyConfig.useCompatibilityMode())
-			.setReloadDaysInterval(copyConfig.getReloadDaysInterval());
+			.setReloadDaysInterval(copyConfig.getReloadDaysInterval())
+			.setCacheDisabled(copyConfig.isCacheDisabled());
 	}
 
 	public FendoDbConfiguration build() {
@@ -193,7 +173,8 @@ public class FendoDbConfigurationBuilder {
 				dataExpirationCheckInterval,
 				reloadDaysInterval,
 				unit,
-				useCompatibilityMode);
+				useCompatibilityMode,
+				cacheDisabled);
 	}
 
 	/**
@@ -300,4 +281,14 @@ public class FendoDbConfigurationBuilder {
 		return this;
 	}
 
+	/**
+	 * Disable caching for the database
+	 * @param disabled
+	 * @return this
+	 */
+	public FendoDbConfigurationBuilder setCacheDisabled(boolean disabled) {
+		this.cacheDisabled = disabled;
+		return this;
+	}
+	
 }

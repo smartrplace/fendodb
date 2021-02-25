@@ -52,7 +52,7 @@ public final class FileObjectList {
 	 * @param foldername
 	 * @throws IOException
 	 */
-	public FileObjectList(String foldername, SlotsDbCache cache, String encodedId, boolean useCompatibilityMode) throws IOException {
+	public FileObjectList(String foldername, FendoCache cache, String encodedId, boolean useCompatibilityMode) throws IOException {
 		// File folder = new File(foldername);
 		this.foldername = foldername;
 		this.useCompatibilityMode = useCompatibilityMode;
@@ -68,7 +68,7 @@ public final class FileObjectList {
 	 * 
 	 * @throws IOException
 	 */
-	final void reLoadFolder(final SlotsDbCache cache, final String encodedId) throws IOException {
+	final void reLoadFolder(final FendoCache cache, final String encodedId) throws IOException {
 
 		File folder = new File(foldername);
 
