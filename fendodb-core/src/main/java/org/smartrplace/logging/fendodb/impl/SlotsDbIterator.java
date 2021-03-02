@@ -69,7 +69,7 @@ class SlotsDbIterator implements Iterator<SampledValue> {
 		}
 		else if (next == null && current != null) // reached the end
 			return false;
-		if (folderValues != null && currentIdx < folderValues.size()) {
+		while(folderValues != null && currentIdx < folderValues.size()) {
 			next = folderValues.get(currentIdx++);
 			if (next.getTimestamp() > end) { // reached the end
 				next = null;
@@ -86,7 +86,8 @@ class SlotsDbIterator implements Iterator<SampledValue> {
 //				current = next;
 //				return hasNext();
 			}
-			return true;
+			if (nextIsNewer(current, next))
+				return true;
 		}
 		parseNextFile();
 		if (folderValues == null) {
