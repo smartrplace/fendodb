@@ -22,6 +22,8 @@ import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
+import java.util.stream.StreamSupport;
 
 import org.junit.Assert;
 import org.junit.Test;
@@ -322,7 +324,7 @@ public class AppendValuesTest extends SlotsDbTest {
 				.build();
 		final long t = 100;
 		final SampledValue sv1 = new SampledValue(new IntegerValue(17), t, Quality.GOOD);
-		final SampledValue sv2 = new SampledValue(new IntegerValue(13), 149, Quality.GOOD); // FIXME
+		final SampledValue sv2 = new SampledValue(new IntegerValue(13), t, Quality.GOOD);
 		try (final SlotsDb instance = new SlotsDb(Paths.get(SlotsDb.DB_TEST_ROOT_FOLDER), null, config, null)) {
 			final RecordedDataStorage data = instance.createRecordedDataStorage("test", cfg1);
 			Assert.assertTrue(data.isEmpty());
@@ -366,13 +368,50 @@ public class AppendValuesTest extends SlotsDbTest {
 	}
 	
 	@Test
-	public void sameTimestampIsIgnoredTwoConfigs() throws IOException, DataRecorderException {
+	public void sameTimestampIsIgnoredTwoConfigs1() throws IOException, DataRecorderException {
 		final RecordedDataConfiguration cfg1 = new RecordedDataConfiguration();
 		cfg1.setStorageType(StorageType.ON_VALUE_UPDATE);
 		final RecordedDataConfiguration cfg2 = new RecordedDataConfiguration();
 		cfg2.setStorageType(StorageType.FIXED_INTERVAL);
 		cfg2.setFixedInterval(100);
 		this.sameTimestampValueIsIgnored(cfg1, cfg2);
+	}
+	
+	@Test
+	public void sameTimestampIsIgnoredTwoConfigs2() throws IOException, DataRecorderException {
+		final FendoDbConfiguration config = FendoDbConfigurationBuilder.getInstance()
+				.setFlushPeriod(0)
+				.build();
+		final long t = 100;
+		final SampledValue sv1 = new SampledValue(new IntegerValue(17), t, Quality.GOOD);
+		 // will be stored under timestamp 100 due to fixed interval mode with interval 100
+		final SampledValue sv2 = new SampledValue(new IntegerValue(13), 149, Quality.GOOD);
+		try (final SlotsDb instance = new SlotsDb(Paths.get(SlotsDb.DB_TEST_ROOT_FOLDER), null, config, null)) {
+			final RecordedDataConfiguration cfg1 = new RecordedDataConfiguration();
+			cfg1.setStorageType(StorageType.ON_VALUE_UPDATE);
+			final RecordedDataConfiguration cfg2 = new RecordedDataConfiguration();
+			cfg2.setStorageType(StorageType.FIXED_INTERVAL);
+			cfg2.setFixedInterval(100);
+			final RecordedDataStorage data = instance.createRecordedDataStorage("test", cfg1);
+			Assert.assertTrue(data.isEmpty());
+			data.insertValue(sv1);
+			if (cfg2 != null)
+				data.setConfiguration(cfg2);
+			data.insertValue(sv2);
+			final List<SampledValue> values = data.getValues(Long.MIN_VALUE);
+			Assert.assertTrue("Timestamp ordering invalid: " + 
+					values.stream().map(sv -> "(" + sv.getTimestamp() + ", " + sv.getValue().getDoubleValue() + ")").collect(Collectors.toList()), 
+					values.size() <= 1 || values.get(0).getTimestamp() < values.get(1).getTimestamp());
+			final Iterator<SampledValue> it = data.iterator();
+			Assert.assertTrue(it.hasNext());
+			final SampledValue first = it.next();
+			if (it.hasNext()) {
+				final SampledValue second = it.next();
+				Assert.assertFalse("Iterator timestamp ordering invalid: " + 
+						Stream.<SampledValue> builder().add(first).add(second).build().map(sv -> "(" + sv.getTimestamp() + ", " + sv.getValue().getDoubleValue() + ")").collect(Collectors.toList()), 
+						second.getTimestamp() > first.getTimestamp());
+			}
+		}
 	}
 
 }
