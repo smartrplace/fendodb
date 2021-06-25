@@ -97,11 +97,13 @@ public class CsvExportPage implements LazyWidgetPage {
 	@Override
 	public void init(ApplicationManager appMan, WidgetPage<?> page) {
 		new CsvExportPageInit(page, factory, appMan, false, "_export",
-				SelectionMode.TAGS_PROPERTIES, true);
+				SelectionMode.TAGS_PROPERTIES, true, false);
 	}
 	
 	static class CsvExportPageInit {
-
+		protected final static boolean simpleImport = Boolean.getBoolean("simpleFenddbImport");
+		protected final boolean isImportPage;
+		
 		protected final WidgetPage<?> page;
 		protected Header header = null;
 		protected final Alert alert;
@@ -134,11 +136,12 @@ public class CsvExportPage implements LazyWidgetPage {
 		@SuppressWarnings("serial")
 		CsvExportPageInit(final WidgetPage<?> page, final FendoDbFactory factory,
 				final ApplicationManager am, boolean isInherited, String subId, SelectionMode defaultSelectionModeIn,
-				boolean showTimePickers) {
+				boolean showTimePickers, boolean isImportPage) {
 			this.page = page;
 			this.subId = subId;
 			this.showTimePickers = showTimePickers;
 			this.defaultSelectionMode = defaultSelectionModeIn;
+			this.isImportPage = isImportPage;
 			if(!isInherited) {
 				page.setTitle("FendoDB CSV export");
 				this.header = new Header(page, "header"+subId, "CSV export");
@@ -179,7 +182,10 @@ public class CsvExportPage implements LazyWidgetPage {
 					selectDefaultItem(defaultSelectionMode);
 				}
 			};
-			selectionMode.setDefaultItems(Arrays.asList(new SelectionMode[] {SelectionMode.TAGS_PROPERTIES, SelectionMode.PATH, SelectionMode.FILTER}));
+			if(simpleImport)
+				selectionMode.setDefaultItems(Arrays.asList(new SelectionMode[] {SelectionMode.PATH, SelectionMode.FILTER}));
+			else
+				selectionMode.setDefaultItems(Arrays.asList(new SelectionMode[] {SelectionMode.TAGS_PROPERTIES, SelectionMode.PATH, SelectionMode.FILTER}));
 			selectionMode.selectDefaultItem(defaultSelectionMode);
 			selectionMode.setTemplate(new DefaultDisplayTemplate<SelectionMode>() {
 				@Override
@@ -223,17 +229,20 @@ public class CsvExportPage implements LazyWidgetPage {
 				}
 	
 			};
-			this.propertiesBox = new PropertiesFlexbox(page, "propertiesBox"+subId) {
-				@Override
-				public void onGET(OgemaHttpRequest req) {
-					if(selectionMode.getSelectedItem(req) != SelectionMode.TAGS_PROPERTIES) {
-						setWidgetVisibility(false, req);
-						return;
+			if(!simpleImport) {
+				this.propertiesBox = new PropertiesFlexbox(page, "propertiesBox"+subId) {
+					@Override
+					public void onGET(OgemaHttpRequest req) {
+						if(selectionMode.getSelectedItem(req) != SelectionMode.TAGS_PROPERTIES) {
+							setWidgetVisibility(false, req);
+							return;
+						}
+						setWidgetVisibility(true, req);
+						super.onGET(req);
 					}
-					setWidgetVisibility(true, req);
-					super.onGET(req);
-				}
-			};
+				};
+			} else
+				propertiesBox = null;
 			
 			this.filterString = new TextField(page, "filterString") {
 				@Override
@@ -320,7 +329,8 @@ public class CsvExportPage implements LazyWidgetPage {
 				}
 				
 			};
-			this.nrDatapointsTrigger = new Button(page, "nrDatapointsTrigger"+subId, "Estimate nr of points") {
+			this.nrDatapointsTrigger = new Button(page, "nrDatapointsTrigger"+subId,
+					isImportPage?"Estimate number of values in time series selected before import":"Estimate nr of points") {
 				
 				public void onPOSTComplete(String data, OgemaHttpRequest req) {
 					final Collection<FendoTimeSeries> series = seriesSelector.getSelectedItems(req);
@@ -336,7 +346,7 @@ public class CsvExportPage implements LazyWidgetPage {
 						return;
 					}
 					final long size;
-					final boolean useSampling = options.isChecked(ALIGN_TIMESTAMPS_PROP, req);
+					final boolean useSampling = (options != null) && options.isChecked(ALIGN_TIMESTAMPS_PROP, req);
 					Long itv = useSampling ? samplingInterval.getNumericalValue(req) : null;
 					if (itv != null) {
 						final TimeUnit unit = samplingUnitSelector.getSelectedItem(req);
@@ -357,126 +367,133 @@ public class CsvExportPage implements LazyWidgetPage {
 				this.endPicker = new CsvStartEndPicker(page, "endPicker"+subId, false);
 			}
 			
-			this.options = new Checkbox2(page, "optionsCheck"+subId) {
-				
-				public void onGET(OgemaHttpRequest req) {
-					if (!isChecked(ALIGN_TIMESTAMPS_PROP, req))
-						setState(SINGLE_FILE_PROP, false, req);
+			if(!(simpleImport && isImportPage)) {
+				this.options = new Checkbox2(page, "optionsCheck"+subId) {
+					
+					public void onGET(OgemaHttpRequest req) {
+						if (!isChecked(ALIGN_TIMESTAMPS_PROP, req))
+							setState(SINGLE_FILE_PROP, false, req);
+					}
+					
+				};
+				if(isInherited) {
+					options.setDefaultCheckboxList(Arrays.asList(
+							new DefaultCheckboxEntry(DATES_FIXED_PROP, "Fix interval on schedule change", false)
+					));
+					return;
 				}
-				
-			};
-			if(isInherited) {
 				options.setDefaultCheckboxList(Arrays.asList(
-						new DefaultCheckboxEntry(DATES_FIXED_PROP, "Fix interval on schedule change", false)
+						new DefaultCheckboxEntry(SINGLE_FILE_PROP, "Write to single file", true),
+						new DefaultCheckboxEntry(DATES_FIXED_PROP, "Fix interval on schedule change", false),
+						new DefaultCheckboxEntry(ALIGN_TIMESTAMPS_PROP, "Align timestamps (equidistant)?", true)
 				));
-				return;
-			}
-			options.setDefaultCheckboxList(Arrays.asList(
-					new DefaultCheckboxEntry(SINGLE_FILE_PROP, "Write to single file", true),
-					new DefaultCheckboxEntry(DATES_FIXED_PROP, "Fix interval on schedule change", false),
-					new DefaultCheckboxEntry(ALIGN_TIMESTAMPS_PROP, "Align timestamps (equidistant)?", true)
-			));
-			this.samplingInterval = new ValueInputField<Long>(page, "samplingInterval", Long.class) {
-				
-				public void onGET(OgemaHttpRequest req) {
-					if (!options.isChecked(ALIGN_TIMESTAMPS_PROP, req))
-						disable(req);
-					else
-						enable(req);
-				}
-				
-			};
-			samplingInterval.setDefaultNumericalValue(15L);
-			samplingInterval.setDefaultLowerBound(1);
-			this.samplingUnitSelector = new EnumDropdown<TimeUnit>(page, "samplingUnitSelector", TimeUnit.class) {
-				
-				public void onGET(OgemaHttpRequest req) {
-					if (!options.isChecked(ALIGN_TIMESTAMPS_PROP, req))
-						disable(req);
-					else
-						enable(req);
-				}
-				
-			};
-			samplingUnitSelector.selectDefaultItem(TimeUnit.MINUTES);
-			this.download = new Download(page, "download", am);
-			this.downloadTrigger = new Button(page, "downloadTrigger", "Download") {
-				
-				public void onGET(OgemaHttpRequest req) {
-					if (seriesSelector.isEmpty(req))
-						disable(req);
-					else
-						enable(req);
-				}
-				
-				public void onPOSTComplete(String data, OgemaHttpRequest req) {
-					final Collection<FendoTimeSeries> timeSeries = seriesSelector.getSelectedItems(req);
-					if (timeSeries.isEmpty()) {
-						download.disable(req);
-						alert.showAlert("Please select a time series", false, req);
-						return;
-					} 
-					final long start = startPicker.getDateLong(req);
-					final long end = endPicker.getDateLong(req);
-					if (end < start) {
-						download.disable(req);
-						alert.showAlert("End time must be >= startTime", false, req);
-						return;
+				this.samplingInterval = new ValueInputField<Long>(page, "samplingInterval", Long.class) {
+					
+					public void onGET(OgemaHttpRequest req) {
+						if ((options == null) || (!options.isChecked(ALIGN_TIMESTAMPS_PROP, req)))
+							disable(req);
+						else
+							enable(req);
 					}
-					final List<String> ids = timeSeries.stream()
-						.map(FendoTimeSeries::getPath)
-						.collect(Collectors.toList());
-					final DumpConfigurationBuilder configBuilder = DumpConfigurationBuilder.getInstance()
-						.setInterval(start, end)
-						.setIncludedIds(ids);
-					if (options.isChecked(ALIGN_TIMESTAMPS_PROP, req)) {
-						Long itv = samplingInterval.getNumericalValue(req);
-						if (itv != null) {
-							final TimeUnit unit = samplingUnitSelector.getSelectedItem(req);
-							itv = TimeUnit.MILLISECONDS.convert(itv, unit);
-							configBuilder.setSamplingInterval(itv, options.isChecked(SINGLE_FILE_PROP, req));
+					
+				};
+				samplingInterval.setDefaultNumericalValue(15L);
+				samplingInterval.setDefaultLowerBound(1);
+				this.samplingUnitSelector = new EnumDropdown<TimeUnit>(page, "samplingUnitSelector", TimeUnit.class) {
+					
+					public void onGET(OgemaHttpRequest req) {
+						if ((options == null) || (!options.isChecked(ALIGN_TIMESTAMPS_PROP, req)))
+							disable(req);
+						else
+							enable(req);
+					}
+					
+				};
+				samplingUnitSelector.selectDefaultItem(TimeUnit.MINUTES);
+				this.download = new Download(page, "download", am);
+				this.downloadTrigger = new Button(page, "downloadTrigger", "Download") {
+					
+					public void onGET(OgemaHttpRequest req) {
+						if (seriesSelector.isEmpty(req))
+							disable(req);
+						else
+							enable(req);
+					}
+					
+					public void onPOSTComplete(String data, OgemaHttpRequest req) {
+						final Collection<FendoTimeSeries> timeSeries = seriesSelector.getSelectedItems(req);
+						if (timeSeries.isEmpty()) {
+							download.disable(req);
+							alert.showAlert("Please select a time series", false, req);
+							return;
+						} 
+						final long start = startPicker.getDateLong(req);
+						final long end = endPicker.getDateLong(req);
+						if (end < start) {
+							download.disable(req);
+							alert.showAlert("End time must be >= startTime", false, req);
+							return;
 						}
-					}
-					final DumpConfiguration configuration = configBuilder.build();
-					final DataRecorderReference ref = slotsSelector.getSelectedItem(req);
-					try {
-						final CloseableDataRecorder instance = ref.getDataRecorder();
-						String path = instance.getPath().normalize().toString();
-						if (path.startsWith("./"))
-							path = path.substring(2);
-						download.setCustomFilename("fendodb_" + path.replace('/', '_'), req);
-						download.setSource(output -> {
-							try {
-								FendoDbTools.zippedDump(instance, output, configuration);
-//								FendoDbTools.dump(instance, output, configuration);
-							} catch (IOException e) {
-								LoggerFactory.getLogger(getClass()).warn("Failed to zip db: ",e);
+						final List<String> ids = timeSeries.stream()
+							.map(FendoTimeSeries::getPath)
+							.collect(Collectors.toList());
+						final DumpConfigurationBuilder configBuilder = DumpConfigurationBuilder.getInstance()
+							.setInterval(start, end)
+							.setIncludedIds(ids);
+						if (options.isChecked(ALIGN_TIMESTAMPS_PROP, req)) {
+							Long itv = samplingInterval.getNumericalValue(req);
+							if (itv != null) {
+								final TimeUnit unit = samplingUnitSelector.getSelectedItem(req);
+								itv = TimeUnit.MILLISECONDS.convert(itv, unit);
+								configBuilder.setSamplingInterval(itv, options.isChecked(SINGLE_FILE_PROP, req));
 							}
-						}, true, "application/zip", req);
-					} catch (IOException e) {
-						download.disable(req);
-						alert.showAlert("Failed to create db dump: " + e, false, req);
-						return;
+						}
+						final DumpConfiguration configuration = configBuilder.build();
+						final DataRecorderReference ref = slotsSelector.getSelectedItem(req);
+						try {
+							final CloseableDataRecorder instance = ref.getDataRecorder();
+							String path = instance.getPath().normalize().toString();
+							if (path.startsWith("./"))
+								path = path.substring(2);
+							download.setCustomFilename("fendodb_" + path.replace('/', '_'), req);
+							download.setSource(output -> {
+								try {
+									FendoDbTools.zippedDump(instance, output, configuration);
+	//								FendoDbTools.dump(instance, output, configuration);
+								} catch (IOException e) {
+									LoggerFactory.getLogger(getClass()).warn("Failed to zip db: ",e);
+								}
+							}, true, "application/zip", req);
+						} catch (IOException e) {
+							download.disable(req);
+							alert.showAlert("Failed to create db dump: " + e, false, req);
+							return;
+						}
+						download.enable(req);
+						alert.showAlert("Download starting", true, req);
 					}
-					download.enable(req);
-					alert.showAlert("Download starting", true, req);
+					
+				};
+				downloadTrigger.addDefaultStyle(ButtonData.BOOTSTRAP_BLUE);
+				if(!isInherited) {
+					buildPage();
+					setDependencies();
 				}
-				
-			};
-			downloadTrigger.addDefaultStyle(ButtonData.BOOTSTRAP_BLUE);
-			buildPage();
-			setDependencies();
+			} else {
+				options = null;
+			}
 		}
 	
 		protected void buildPage() {
 			int row = 0;
-			page.append(header).append(alert).linebreak().append(new StaticTable(2, 3, new int[] {2,2,2,6})
+			page.append(header).append(alert).linebreak().append(new StaticTable(2, 4, new int[] {2,2,2,6})
 				.setContent(row, 0, "Select FendoDB").setContent(row, 1, slotsSelector).setContent(row++, 2, selectionMode)
-				.setContent(row, 0, "Select tags").setContent(row, 1, tagsSelect).setContent(row++, 1, filterString)
-			).append(new StaticTable(2, 2, new int[] {2,10})
-				.setContent(row=0, 0, "Select properties").setContent(row++, 1, propertiesBox)
-				.setContent(row, 0, applySelection)
+				.setContent(row, 0, simpleImport?"Search String":"Select tags").setContent(row, 1, tagsSelect).setContent(row++, 1, filterString)
 			);
+			if(simpleImport) {
+				page.append(new StaticTable(1, 2, new int[] {2,10})
+					.setContent(0, 0, applySelection));
+			}
 			final Flexbox samplingFlex = new Flexbox(page, "samplingFlex", true);
 			samplingFlex.addItem(samplingInterval, null).addItem(samplingUnitSelector, null);
 			samplingFlex.setDefaultJustifyContent(JustifyContent.FLEX_LEFT);
@@ -499,8 +516,10 @@ public class CsvExportPage implements LazyWidgetPage {
 			slotsSelector.triggerAction(tagsSelect, TriggeringAction.POST_REQUEST, TriggeredAction.GET_REQUEST);
 			slotsSelector.triggerAction(seriesSelector, TriggeringAction.GET_REQUEST, TriggeredAction.GET_REQUEST); // initial schedules selection
 			slotsSelector.triggerAction(seriesSelector, TriggeringAction.POST_REQUEST, TriggeredAction.GET_REQUEST); // initial schedules selection
-			tagsSelect.triggerAction(propertiesBox, TriggeringAction.GET_REQUEST, TriggeredAction.GET_REQUEST);
-			tagsSelect.triggerAction(propertiesBox, TriggeringAction.POST_REQUEST, TriggeredAction.GET_REQUEST);
+			if(propertiesBox != null) {
+				tagsSelect.triggerAction(propertiesBox, TriggeringAction.GET_REQUEST, TriggeredAction.GET_REQUEST);
+				tagsSelect.triggerAction(propertiesBox, TriggeringAction.POST_REQUEST, TriggeredAction.GET_REQUEST);
+			}
 			applySelection.triggerAction(seriesSelector, TriggeringAction.POST_REQUEST, TriggeredAction.GET_REQUEST);
 			applySelection.triggerAction(alert, TriggeringAction.POST_REQUEST, TriggeredAction.GET_REQUEST);
 			
@@ -513,8 +532,10 @@ public class CsvExportPage implements LazyWidgetPage {
 				seriesSelector.triggerAction(downloadTrigger, TriggeringAction.GET_REQUEST, TriggeredAction.GET_REQUEST);
 				seriesSelector.triggerAction(downloadTrigger, TriggeringAction.POST_REQUEST, TriggeredAction.GET_REQUEST);
 			}
-			options.triggerAction(nrDatapoints, TriggeringAction.POST_REQUEST, TriggeredAction.GET_REQUEST);
-			options.triggerAction(options, TriggeringAction.POST_REQUEST, TriggeredAction.GET_REQUEST);
+			if(options != null) {
+				options.triggerAction(nrDatapoints, TriggeringAction.POST_REQUEST, TriggeredAction.GET_REQUEST);
+				options.triggerAction(options, TriggeringAction.POST_REQUEST, TriggeredAction.GET_REQUEST);
+			}
 			
 			if(showTimePickers) {
 				seriesSelector.triggerAction(startPicker, TriggeringAction.GET_REQUEST, TriggeredAction.GET_REQUEST);

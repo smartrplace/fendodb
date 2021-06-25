@@ -56,16 +56,18 @@ import de.iwes.widgets.template.DefaultDisplayTemplate;
 		property= {
 				LazyWidgetPage.BASE_URL + "=" + FendoVizConstants.URL_BASE, 
 				LazyWidgetPage.RELATIVE_URL + "=csvimport.html",
-				LazyWidgetPage.MENU_ENTRY + "=CSV import"
+				LazyWidgetPage.MENU_ENTRY + "=CSV Import"
 		}
 )
 public class CsvImportPage implements LazyWidgetPage {
-	
+
 	@Reference
 	private FendoDbFactory factory;
 	
 	@Override
 	public void init(ApplicationManager appMan, WidgetPage<?> page) {
+		page.getMenuConfiguration().setShowMessages(false);
+		page.getMenuConfiguration().setLanguageSelectionVisible(false);
 		new CsvImportPageInit(page, factory, appMan);
 	}
 	
@@ -98,11 +100,11 @@ public class CsvImportPage implements LazyWidgetPage {
 		//private final ButtonConfirm deleteIntervalButton;
 		
 		CsvImportPageInit(WidgetPage<?> page, FendoDbFactory factory, ApplicationManager am) {
-			super(page, factory, am, true, "_import", SelectionMode.FILTER, false);
+			super(page, factory, am, true, "_import", SelectionMode.FILTER, false, true);
 			page.setTitle("FendoDB CSV import");
-			this.header = new Header(page, "header"+subId, "CSV import");
+			this.header = new Header(page, "header"+subId, "CSV Import");
 			header.addDefaultStyle(WidgetData.TEXT_ALIGNMENT_LEFT);
-			header.setDefaultColor("red");
+			//header.setDefaultColor("red");
 			
 			formatDrop = new TemplateDropdown<ImportFormat>(page, "formatDrop");
 			formatDrop.setTemplate(new DefaultDisplayTemplate<ImportFormat>() {
@@ -161,13 +163,7 @@ public class CsvImportPage implements LazyWidgetPage {
 						alert.showAlert("Currently CSV import is only supported for single time series", false, req);
 						return;						
 					}
-					/*final long start = startPicker.getDateLong(req);
-					final long end = endPicker.getDateLong(req);
-					if (end < start) {
-						startImportButton.disable(req);
-						alert.showAlert("End time must be >= startTime", false, req);
-						return;
-					} else startImportButton.enable(req);*/
+
 					final ImportFormat format = formatDrop.getSelectedItem(req);
 					if(sourceDrop.getSelectedItem(req) == SourceType.FILE_UPLOAD) {
 						importUpload.registerListener(listener, new UploadData(format, tsList.get(0)), req);
@@ -189,34 +185,6 @@ public class CsvImportPage implements LazyWidgetPage {
 	    	startImportButton.triggerAction(importUpload, TriggeringAction.POST_REQUEST, TriggeredAction.POST_REQUEST);
 			if(alert != null) startImportButton.triggerAction(alert, TriggeringAction.POST_REQUEST, TriggeredAction.GET_REQUEST);
 			
-			/*deleteIntervalButton = new ButtonConfirm(page, "deleteInterval", "Delete Interval of row") {
-				private static final long serialVersionUID = 1L;
-				@Override
-				public void onPOSTComplete(String data, OgemaHttpRequest req) {
-					List<FendoTimeSeries> tsList = seriesSelector.getSelectedItems(req);
-					final long start = startPicker.getDateLong(req);
-					final long end = endPicker.getDateLong(req);
-					if (end < start) {
-						deleteIntervalButton.disable(req);
-						alert.showAlert("End time must be >= startTime", false, req);
-						return;
-					} else deleteIntervalButton.enable(req);
-					for(FendoTimeSeries fts: tsList) {
-						FendoDBImportUtils.deleteInterval(start, end, fts);
-					}
-				}
-				@Override
-				public String getConfirmPopupTitle(OgemaHttpRequest req) {
-					List<FendoTimeSeries> tsList = seriesSelector.getSelectedItems(req);
-					String text;
-					if(tsList.isEmpty())
-						text = "(no timeseries selected)";
-					else
-						text = tsList.get(0).getPath()+" and "+(tsList.size()-1)+" more";
-					return "Really delete "+text+" for selected interval?";
-				}
-			};*/
-			
 			buildPage();
 			setDependencies();
 		}
@@ -224,18 +192,29 @@ public class CsvImportPage implements LazyWidgetPage {
 		@Override
 		protected void buildPage() {
 			int row = 0;
-			Label infoLabel = new Label(page, "infoLabel", "Note: Importing CSV files requires that the time series is empty before the"
+			Label infoLabel = new Label(page, "infoLabel", simpleImport?"Note: Importing data into time series that have ongoing data"
+					+ "collection from a sensor or actor configured may require stopping the data acquisition during import. "
+					+ "Please contact Smartrplace support for assistence in such a case.":
+				"Note: Importing CSV files requires that the time series is empty before the"
 					+ " start time of the CSV files. See https://github.com/smartrplace/fendodb/wiki/Data-Manipulation-and-Import "
 					+ "for details."); 
 			infoLabel.addDefaultStyle(LabelData.BOOTSTRAP_RED);
 			
 			page.append(header).append(alert).linebreak().append(new StaticTable(2, 4, new int[] {2,2,2,6})
-					.setContent(row, 0, "Select FendoDB").setContent(row, 1, slotsSelector).setContent(row++, 2, selectionMode)
-					.setContent(row, 0, "Select tags").setContent(row, 1, tagsSelect).setContent(row++, 1, filterString)
-			).append(new StaticTable(3, 2, new int[] {2,10})
-				.setContent(row=0, 0, "Select properties").setContent(row++, 1, propertiesBox)
-				.setContent(row, 0, applySelection).setContent(row, 1, infoLabel)
+					.setContent(row, 0, simpleImport?"Select database":"Select FendoDB").setContent(row, 1, slotsSelector).setContent(row++, 2, selectionMode)
+					.setContent(row, 0, simpleImport?"Search String":"Select tags").setContent(row, 1, tagsSelect).setContent(row++, 1, filterString)
 			);
+			if(!simpleImport) {
+				page.append(new StaticTable(2, 2, new int[] {2,10})
+					.setContent(row=0, 0, "Select properties").setContent(row++, 1, propertiesBox)
+					.setContent(row, 0, applySelection).setContent(row, 1, infoLabel)
+				);
+			} else {
+				page.append(new StaticTable(1, 2, new int[] {2,10})
+						.setContent(0, 0, applySelection).setContent(0, 1, infoLabel)
+					);				
+			}
+			
 			//final Flexbox samplingFlex = new Flexbox(page, "samplingFlex", true);
 			
 			/*final SimpleGrid grid = new SimpleGrid(page, "mainGrid", true)
@@ -249,10 +228,10 @@ public class CsvImportPage implements LazyWidgetPage {
 					.addItem(startImportButton, true, null).addItem(importUpload, false, null);
 			grid.setDefaultAppendFillColumn(true);*/
 			row = 0;
-			final StaticTable grid = new StaticTable(6, 2)
+			final StaticTable grid = new StaticTable(5, 2)
 					.setContent(row, 0, "Select timeseries").setContent(row++, 1, seriesSelector)
 					.setContent(row, 0, "CSV Format").setContent(row++, 1, formatDrop)
-					.setContent(row, 0, "Options").setContent(row++, 1, options)
+					//.setContent(row, 0, "Options").setContent(row++, 1, options)
 					.setContent(row, 0, sourceDrop).setContent(row++, 1, sourceFile)
 					.setContent(row, 0, nrDatapointsTrigger).setContent(row++, 1, nrDatapoints)
 					.setContent(row, 0, startImportButton).setContent(row++, 1, importUpload);
