@@ -15,8 +15,10 @@
  */
 package org.smartrplace.logging.fendodb.impl;
 
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.nio.file.Files;
+import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.util.Iterator;
 import java.util.TimerTask;
@@ -224,19 +226,22 @@ abstract class InfoTask extends TimerTask {
 		/*
 		 * recursive function to get the size of a folder. sums up all files. needs an initial LONG to store size to.
 		 */
-		private final long getDiskUsage(final Path folder) throws IOException {
+		private long getDiskUsage(final Path folder) throws IOException {
 			final AtomicLong length = new AtomicLong(0);
 			recursive_size_walker(folder, length);
 			return length.get();
 		}
 
-		private final void recursive_size_walker(final Path folder, final AtomicLong length) throws IOException {
+		private void recursive_size_walker(final Path folder, final AtomicLong length) throws IOException {
 			try (final Stream<Path> stream = Files.list(folder)) {
 				stream.forEach(f -> {
 					try {
-						length.getAndAdd(Files.size(f));
-						if (Files.isDirectory(f))
+						if (Files.isDirectory(f)) {
 							recursive_size_walker(f, length);
+                        }
+                        length.getAndAdd(Files.size(f));
+                    } catch (NoSuchFileException nsfe) {
+                        logger.debug("file deleted: {}", nsfe.getMessage());
 					} catch (IOException e) {
 						logger.error("Failed to determine folder size",e);
 					}

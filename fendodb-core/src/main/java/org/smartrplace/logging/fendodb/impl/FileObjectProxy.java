@@ -433,13 +433,13 @@ public final class FileObjectProxy {
 				 * If StartTimeStamp is newer then the Timestamp of the value to store, this value can't be stored.
 				 */
 				long roundedTimestamp = getRoundedTimestamp(timestamp, configuration);
-				if (toStoreIn.getStartTimeStamp() > roundedTimestamp) {
+				if (toStoreIn.getStartTimeStamp() >= roundedTimestamp) {
 					return;
 				}
 			}
 	
 			if (toStoreIn == null) {
-				throw new IllegalStateException("could not find log file"); // FIXME
+				throw new IllegalStateException("could not find log file");
 			}
 	
 			/*
