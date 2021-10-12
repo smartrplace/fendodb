@@ -1,8 +1,10 @@
 package org.smartrplace.logging.fendodb.impl;
 
+import java.io.BufferedOutputStream;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
+import java.io.OutputStream;
 import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -28,15 +30,16 @@ public class FileUtils {
 	public static Path writeJavaBytes(Path directory, String filename, Object object) throws IOException {
 		final Path tempFile = directory.resolve(getTempFileName(filename));
 		final Path targetFile = directory.resolve(filename);
-		try (ObjectOutputStream oos = new ObjectOutputStream(Files.newOutputStream(tempFile, 
-					StandardOpenOption.WRITE, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING))) {
+		try (OutputStream fos = Files.newOutputStream(tempFile, 
+					StandardOpenOption.WRITE, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
+				BufferedOutputStream bos = new BufferedOutputStream(fos);
+				ObjectOutputStream oos = new ObjectOutputStream(bos)) {
 			oos.writeObject(object);
 		}
 		try {
 			Files.move(tempFile, targetFile, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
 		} catch (AtomicMoveNotSupportedException e) {
-			// XXX might be quite annoying to log this on every failed attempt
-			LoggerFactory.getLogger(FileUtils.class).warn("The atomic move operation failed for {}", tempFile, e);  
+			LoggerFactory.getLogger(FileUtils.class).debug("The atomic move operation failed for {}", tempFile, e);
 			Files.move(tempFile, targetFile, StandardCopyOption.REPLACE_EXISTING);
 		}
 		return targetFile;
