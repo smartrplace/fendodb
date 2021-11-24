@@ -18,6 +18,7 @@ package org.smartrplace.logging.fendodb.impl;
 import java.io.DataInputStream;
 import java.io.File;
 import java.io.IOException;
+import java.io.RandomAccessFile;
 import java.nio.Buffer;
 import java.nio.ByteBuffer;
 import java.nio.MappedByteBuffer;
@@ -32,8 +33,11 @@ import org.smartrplace.logging.fendodb.impl.FendoCache.FendoInstanceCache;
 public class FlexibleIntervalFileObject extends FileObject {
 
 	private long lastTimestamp;
-	private static final long headerend = 16;
-
+	private static final long HEADERSIZE = 16;
+    private static final int DATASETSIZE = (Long.SIZE + Double.SIZE + Byte.SIZE) / Byte.SIZE;
+    
+    private static final boolean FLUSH_ON_APPEND = Boolean.getBoolean("org.smartrplace.fendodb.flush");
+    
 	protected FlexibleIntervalFileObject(File file, FendoInstanceCache cache) throws IOException {
 		super(file, cache);
 		lastTimestamp = startTimeStamp;
@@ -52,6 +56,20 @@ public class FlexibleIntervalFileObject extends FileObject {
 		// line below should be obsolete, since flexible interval needs no rounded timestamp
 		//startTimeStamp = FileObjectProxy.getRoundedTimestamp(startTimeStamp, storagePeriod);
 	}
+    
+    @Override
+    protected void enableOutput() throws IOException {
+        super.enableOutput();
+        long len = dataFile.length();
+        long trashLength = (len - HEADERSIZE) % 17;
+        if (trashLength != 0) {
+            long offset = ((len - HEADERSIZE) / 17) * 17 + HEADERSIZE;
+            logger.warn("File {} has bad length ({}), will append starting at previous good dataset offset {}",
+                    dataFile.getCanonicalPath(), len, offset);
+            fos.getChannel().truncate(offset);
+            length = offset;
+        }
+    }
 
 	@Override
 	public void append(double value, long timestamp, byte flag) throws IOException {
@@ -66,6 +84,9 @@ public class FlexibleIntervalFileObject extends FileObject {
 			dos.writeByte(flag);
 			lastTimestamp = timestamp;
 			length += 17;
+            if (FLUSH_ON_APPEND) {
+                bos.flush();
+            }
 		}
 
 	}
@@ -81,20 +102,12 @@ public class FlexibleIntervalFileObject extends FileObject {
 		// and lets stick to this solution for now:
 		int dataSetCount = getDataSetCountInternal();
 		if (dataSetCount > 1) {
-			try {
+			try (RandomAccessFile raf = new RandomAccessFile(dataFile, "r")) {
 				if (!canRead) {
 					enableInput();
 				}
-				final byte[] b = new byte[(int) (length - headerend)];
-				synchronized (this) {
-					fis.getChannel().position(headerend);
-					dis.read(b, 0, b.length);
-				}
-				ByteBuffer bb = ByteBuffer.wrap(b);
-				// set position to last entries timestamp (Long, Double and Byte size in bits
-				// so divide through Byte.SIZE to get size in bytes)
-				((Buffer) bb).position((dataSetCount - 1) * getDataSetSize());
-				long l = bb.getLong();
+                raf.seek((dataSetCount - 1) * DATASETSIZE + HEADERSIZE);
+				long l = raf.readLong();
 				return l;
 			} catch (IOException | NullPointerException e) {
 				logger.error(e.getMessage(), e);
@@ -114,8 +127,8 @@ public class FlexibleIntervalFileObject extends FileObject {
 			enableInput();
 		}
 
-		long startpos = headerend;
-		final byte[] b = new byte[(int) (length - headerend)];
+		long startpos = HEADERSIZE;
+		final byte[] b = new byte[(int) (length - HEADERSIZE)];
 		synchronized (this) {
 			fis.getChannel().position(startpos);
 			dis.read(b, 0, b.length);
@@ -148,8 +161,8 @@ public class FlexibleIntervalFileObject extends FileObject {
 		if (!canRead) {
 			enableInput();
 		}
-		long startpos = headerend;
-		final byte[] b = new byte[(int) (length - headerend)];
+		long startpos = HEADERSIZE;
+		final byte[] b = new byte[(int) (length - HEADERSIZE)];
 		synchronized (this) {
 			fis.getChannel().position(startpos);
 			dis.read(b, 0, b.length);
@@ -178,8 +191,8 @@ public class FlexibleIntervalFileObject extends FileObject {
 			enableInput();
 		}
 
-		long startpos = headerend;
-		final byte[] b = new byte[(int) (length - headerend)];
+		long startpos = HEADERSIZE;
+		final byte[] b = new byte[(int) (length - HEADERSIZE)];
 		synchronized (this) {
 			fis.getChannel().position(startpos);
 			dis.read(b, 0, b.length);
@@ -213,8 +226,8 @@ public class FlexibleIntervalFileObject extends FileObject {
 		if (!canRead) {
 			enableInput();
 		}
-		long startpos = headerend;
-		final byte[] b = new byte[(int) (length - headerend)];
+		long startpos = HEADERSIZE;
+		final byte[] b = new byte[(int) (length - HEADERSIZE)];
 		synchronized (this) {
 			fis.getChannel().position(startpos);
 			dis.read(b, 0, b.length);
@@ -240,7 +253,7 @@ public class FlexibleIntervalFileObject extends FileObject {
 		if (!canRead) {
 			enableInput();
 		}
-		long startpos = headerend;
+		long startpos = HEADERSIZE;
 
 		/*
 		fis.getChannel().position(startpos);
@@ -250,7 +263,7 @@ public class FlexibleIntervalFileObject extends FileObject {
 		((Buffer) bb).rewind();
 		*/
 		synchronized (this) {
-			final MappedByteBuffer bb = fis.getChannel().map(FileChannel.MapMode.READ_ONLY, startpos, length - headerend);
+			final MappedByteBuffer bb = fis.getChannel().map(FileChannel.MapMode.READ_ONLY, startpos, length - HEADERSIZE);
 			final int countOfDataSets = getDataSetCountInternal();
 			long tcand = Long.MIN_VALUE;
 			double dcand = Double.NaN;
@@ -276,7 +289,7 @@ public class FlexibleIntervalFileObject extends FileObject {
 
 	@Override
 	protected int getDataSetCountInternal() {
-		return (int) ((length - headerend) / getDataSetSize());
+		return (int) ((length - HEADERSIZE) / DATASETSIZE);
 	}
 
 	@Override
@@ -289,8 +302,8 @@ public class FlexibleIntervalFileObject extends FileObject {
 		if (!canRead) {
 			enableInput();
 		}
-		long startpos = headerend;
-		final byte[] b = new byte[(int) (length - headerend)];
+		long startpos = HEADERSIZE;
+		final byte[] b = new byte[(int) (length - HEADERSIZE)];
 		synchronized (this) {
 			fis.getChannel().position(startpos);
 			dis.read(b, 0, b.length);
@@ -313,10 +326,6 @@ public class FlexibleIntervalFileObject extends FileObject {
 		}
 		
 		return cnt;
-	}
-
-	private final static int getDataSetSize() {
-		return (Long.SIZE + Double.SIZE + Byte.SIZE) / Byte.SIZE;
 	}
 
 }

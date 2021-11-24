@@ -148,7 +148,7 @@ public abstract class FileObject {
 		canWrite = true;
 		canRead = false;
 	}
-
+    
 	/*
 	 * Requires the SlotsDbStorage read lock to be held.
 	 */
