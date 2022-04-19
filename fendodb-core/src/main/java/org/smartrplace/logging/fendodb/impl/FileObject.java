@@ -22,6 +22,10 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -51,12 +55,12 @@ public abstract class FileObject {
 	 * File length will be cached to avoid system calls and improve I/O Performance
 	 */
 	protected long length = 0;
-
+	
 	public FileObject(String filename, FendoInstanceCache cache) throws IOException {
 		this.cache = cache;
 		canWrite = false;
 		canRead = false;
-		dataFile = new File(filename);
+		dataFile = getFileForName(filename);
 		length = dataFile.length();
 		if (dataFile.exists() && length >= 16) {
 			/*
@@ -81,6 +85,23 @@ public abstract class FileObject {
 				}
 			}
 		}
+	}
+	
+	private File getFileForName(String filename) {
+		Path f = Paths.get(filename);
+		String label = f.getName(f.getNameCount()-2).toString();
+		//FIXME only works for ogema labels
+		if (label.length() > 255) {
+			Path base = f.getParent().getParent();
+			if (label.contains("%")) {
+				String decodedLabel = URLDecoder.decode(label, StandardCharsets.UTF_8);
+				if (decodedLabel.contains("/")) {
+					System.out.println("return: " + base.resolve(decodedLabel).resolve(f.getFileName()).toFile());
+					return base.resolve(decodedLabel).resolve(f.getFileName()).toFile();
+				}
+			}
+		}
+		return f.toFile();
 	}
 
 	/**
@@ -379,6 +400,7 @@ public abstract class FileObject {
 	}
 
 	public static FileObject getFileObject(File file, FendoInstanceCache cache) throws IOException {
+		System.out.println("getFileObject: " + file);
 		if (file.getName().startsWith("c")) {
 			return new ConstantIntervalFileObject(file, cache);
 		}

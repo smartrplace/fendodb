@@ -40,7 +40,8 @@ public final class FileObjectList {
 	// synchronized by read-write lock of the respective SlotsDbStorage
 	// adding a file requires a write lock, reading requires a read lock
 	private List<FileObject> files;
-	private String foldername;
+	private final String foldername;
+	private final String dayFolderName;
 	private long firstTS;
 	private int size;
 	private final boolean useCompatibilityMode;
@@ -52,9 +53,10 @@ public final class FileObjectList {
 	 * @param foldername
 	 * @throws IOException
 	 */
-	public FileObjectList(String foldername, FendoCache cache, String encodedId, boolean useCompatibilityMode) throws IOException {
+	FileObjectList(String foldername, String dayFolderName, FendoCache cache, String encodedId, boolean useCompatibilityMode) throws IOException {
 		// File folder = new File(foldername);
 		this.foldername = foldername;
+		this.dayFolderName = dayFolderName;
 		this.useCompatibilityMode = useCompatibilityMode;
 		reLoadFolder(cache, encodedId);
 	}
@@ -69,7 +71,7 @@ public final class FileObjectList {
 	 * @throws IOException
 	 */
 	final void reLoadFolder(final FendoCache cache, final String encodedId) throws IOException {
-
+		
 		File folder = new File(foldername);
 
 		files = new ArrayList<>(1);
@@ -98,8 +100,8 @@ public final class FileObjectList {
 		 * set first Timestamp for this FileObjectList if there are no files -> first TS = TS@ 00:00:00 o'clock.
 		 */
 		if (size == 0) {
-			firstTS = !useCompatibilityMode ? Long.parseLong(folder.getParentFile().getName())
-					: TimeUtils.parseCompatibilityFolderName(folder.getParentFile().getName());
+			firstTS = !useCompatibilityMode ? Long.parseLong(dayFolderName)
+					: TimeUtils.parseCompatibilityFolderName(dayFolderName);
 //			
 //			SimpleDateFormat sdf = new SimpleDateFormat("yyyyMMdd");
 //			try {
