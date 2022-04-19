@@ -98,7 +98,6 @@ public abstract class FileObject {
 				try {
 					decodedLabel = URLDecoder.decode(label, "UTF-8");
 					if (decodedLabel.contains("/")) {
-						System.out.println("return: " + base.resolve(decodedLabel).resolve(f.getFileName()).toFile());
 						return base.resolve(decodedLabel).resolve(f.getFileName()).toFile();
 					}
 				} catch (UnsupportedEncodingException ex) {
