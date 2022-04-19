@@ -17,8 +17,8 @@ package org.smartrplace.logging.fendodb.impl;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.io.UnsupportedEncodingException;
 import java.net.URLDecoder;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -1036,26 +1036,30 @@ public final class FileObjectProxy {
 	 * @return
 	 */
 	private FileObjectList getFileObjectList(final long day, String label) {
-		final String id = label + day;
-		
-		//FIXME only works for length 255+ ogema labels
-		String labelFsPath
-				= label.length() > 255 && label.contains("%")
-				? URLDecoder.decode(label, StandardCharsets.UTF_8)
-				: label;
-		
-		return openFilesHM.computeIfAbsent(id, key -> {
-			try {
-				controlHashtableSize();
-				String dayFolderName = getDayFolderName(day);
-				return new FileObjectList(
-						rootNodeString + "/" + dayFolderName + "/" + labelFsPath,
-						dayFolderName, cache, label, useCompatibilityMode);
-			} catch (IOException e) {
-				logger.error("Failed to construct FileObjectList",e);
-				return null;
-			}
-		});
+		try {
+			final String id = label + day;
+			
+			//FIXME only works for length 255+ ogema labels
+			String labelFsPath
+					= label.length() > 255 && label.contains("%")
+					? URLDecoder.decode(label, "UTF-8")
+					: label;
+			
+			return openFilesHM.computeIfAbsent(id, key -> {
+				try {
+					controlHashtableSize();
+					String dayFolderName = getDayFolderName(day);
+					return new FileObjectList(
+							rootNodeString + "/" + dayFolderName + "/" + labelFsPath,
+							dayFolderName, cache, label, useCompatibilityMode);
+				} catch (IOException e) {
+					logger.error("Failed to construct FileObjectList",e);
+					return null;
+				}
+			});
+		} catch (UnsupportedEncodingException ex) {
+			return null;
+		}
 	}
 	
 	

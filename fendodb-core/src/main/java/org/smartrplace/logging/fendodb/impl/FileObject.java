@@ -22,8 +22,8 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.UnsupportedEncodingException;
 import java.net.URLDecoder;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
@@ -48,14 +48,14 @@ public abstract class FileObject {
 	protected FileInputStream fis;
 	protected boolean canWrite;
 	protected volatile boolean canRead;
-	
+
 	private final FendoInstanceCache cache;
 
 	/*
 	 * File length will be cached to avoid system calls and improve I/O Performance
 	 */
 	protected long length = 0;
-	
+
 	public FileObject(String filename, FendoInstanceCache cache) throws IOException {
 		this.cache = cache;
 		canWrite = false;
@@ -86,18 +86,22 @@ public abstract class FileObject {
 			}
 		}
 	}
-	
+
 	private File getFileForName(String filename) {
 		Path f = Paths.get(filename);
-		String label = f.getName(f.getNameCount()-2).toString();
+		String label = f.getName(f.getNameCount() - 2).toString();
 		//FIXME only works for ogema labels
 		if (label.length() > 255) {
 			Path base = f.getParent().getParent();
 			if (label.contains("%")) {
-				String decodedLabel = URLDecoder.decode(label, StandardCharsets.UTF_8);
-				if (decodedLabel.contains("/")) {
-					System.out.println("return: " + base.resolve(decodedLabel).resolve(f.getFileName()).toFile());
-					return base.resolve(decodedLabel).resolve(f.getFileName()).toFile();
+				String decodedLabel;
+				try {
+					decodedLabel = URLDecoder.decode(label, "UTF-8");
+					if (decodedLabel.contains("/")) {
+						System.out.println("return: " + base.resolve(decodedLabel).resolve(f.getFileName()).toFile());
+						return base.resolve(decodedLabel).resolve(f.getFileName()).toFile();
+					}
+				} catch (UnsupportedEncodingException ex) {
 				}
 			}
 		}
@@ -106,7 +110,7 @@ public abstract class FileObject {
 
 	/**
 	 * Read 16 bytes of File Header.
-	 * 
+	 *
 	 * @param dis2
 	 */
 	abstract void readHeader(DataInputStream dis) throws IOException;
@@ -169,16 +173,18 @@ public abstract class FileObject {
 		canWrite = true;
 		canRead = false;
 	}
-    
+
 	/*
 	 * Requires the SlotsDbStorage read lock to be held.
 	 */
 	protected void enableInput() throws IOException {
-		if (canRead)
+		if (canRead) {
 			return;
+		}
 		synchronized (this) {
-			if (canRead)
+			if (canRead) {
 				return;
+			}
 			/*
 			 * Close Output Streams for enabling input.
 			 */
@@ -197,7 +203,7 @@ public abstract class FileObject {
 				fos.close();
 				fos = null;
 			}
-	
+
 			/*
 			 * enabling input
 			 */
@@ -212,9 +218,8 @@ public abstract class FileObject {
 
 	/**
 	 * creates the file, if it doesn't exist.
-	 * 
-	 * @param startTimeStamp
-	 *            for file header
+	 *
+	 * @param startTimeStamp for file header
 	 */
 	public void createFileAndHeader(long startTimeStamp, long stepIntervall) throws IOException {
 		if (!dataFile.exists() || length < 16) {
@@ -227,7 +232,6 @@ public abstract class FileObject {
 
 			//OLD 
 			//this.startTimeStamp = FileObjectProxy.getRoundedTimestamp(startTimeStamp, stepIntervall);
-
 			this.startTimeStamp = startTimeStamp;
 
 			this.storagePeriod = stepIntervall;
@@ -241,22 +245,24 @@ public abstract class FileObject {
 			dos.writeLong(this.startTimeStamp);
 			dos.writeLong(stepIntervall);
 			dos.flush();
-			length += 16; /* wrote 2*8 Bytes */
+			length += 16;
+			/* wrote 2*8 Bytes */
 			canWrite = true;
 			canRead = false;
 		}
 	}
-	
+
 	public List<SampledValue> readFully() throws IOException {
 		List<SampledValue> values = cache.getCache();
-		if (values != null)
+		if (values != null) {
 			return values;
+		}
 		values = readFullyInternal();
 		// store until next write access
 		cache.cache(Collections.unmodifiableList(values));
 		return values;
 	}
-	
+
 	public List<SampledValue> read(long start, long end) throws IOException {
 		if (start <= startTimeStamp && end >= getTimestampForLatestValue()) {
 			return readFully(); // caches values
@@ -266,31 +272,37 @@ public abstract class FileObject {
 			final List<SampledValue> copy = new ArrayList<>(values.size());
 			for (final SampledValue sv : values) {
 				final long t = sv.getTimestamp();
-				if (t < start)
+				if (t < start) {
 					continue;
-				if (t > end)
+				}
+				if (t > end) {
 					break;
+				}
 				copy.add(sv);
 			}
 			return copy;
 		}
 		return readInternal(start, end);
-	};
+	}
+
+	;
 
 
 	public int getDataSetCount() {
 		final List<SampledValue> values = cache.getCache();
-		if (values != null) {	
+		if (values != null) {
 			return values.size();
 		}
 		return getDataSetCountInternal();
-	};
+	}
+
+	;
 	
 	public int getDataSetCount(long start, long end) throws IOException {
 		final List<SampledValue> values = cache.getCache();
 		if (values != null) {
 			if (start <= startTimeStamp && !values.isEmpty()) {
-				long endTimeStamp = values.get(values.size()-1).getTimestamp();
+				long endTimeStamp = values.get(values.size() - 1).getTimestamp();
 				if (end >= endTimeStamp) {
 					return values.size();
 				}
@@ -298,49 +310,56 @@ public abstract class FileObject {
 			int cnt = 0;
 			for (final SampledValue sv : values) {
 				final long t = sv.getTimestamp();
-				if (t < start)
+				if (t < start) {
 					continue;
-				if (t > end)
+				}
+				if (t > end) {
 					break;
+				}
 				cnt++;
 			}
 			return cnt;
 		}
 		return getDataSetCountInternal(start, end);
-	};
+	}
+
+	;
 
 
 	public long getTimestampForLatestValue() {
 		final List<SampledValue> values = cache.getCache();
 		if (values != null && !values.isEmpty()) {
-			return values.get(values.size()-1).getTimestamp();
+			return values.get(values.size() - 1).getTimestamp();
 		}
 		return getTimestampForLatestValueInternal();
-	};
+	}
+
+	;
 
 	public abstract void append(double value, long timestamp, byte flag) throws IOException;
 
 	protected abstract List<SampledValue> readInternal(long start, long end) throws IOException;
 
 	protected abstract List<SampledValue> readFullyInternal() throws IOException;
-	
+
 	public abstract SampledValue read(long timestamp) throws IOException;
 
 	public abstract SampledValue readNextValue(long timestamp) throws IOException;
-	
+
 	public abstract SampledValue readPreviousValue(long timestamp) throws IOException;
-	
+
 	protected abstract long getTimestampForLatestValueInternal();
-	
+
 	protected abstract int getDataSetCountInternal();
+
 	protected abstract int getDataSetCountInternal(long start, long end) throws IOException;
-	
+
 	public abstract long getStoringPeriod();
 
 	/**
-	 * Closes and Flushes underlying Input- and OutputStreams.
-	 * Requires the SlotsDbStorage write lock to be held. 
-	 * 
+	 * Closes and Flushes underlying Input- and OutputStreams. Requires the
+	 * SlotsDbStorage write lock to be held.
+	 *
 	 * @throws IOException
 	 */
 	public void close() throws IOException {
@@ -369,7 +388,7 @@ public abstract class FileObject {
 
 	/**
 	 * Flushes the underlying Data Streams.
-	 * 
+	 *
 	 * @throws IOException
 	 */
 	public void flush() throws IOException {
@@ -390,11 +409,9 @@ public abstract class FileObject {
 	public static FileObject getFileObject(String fileName, FendoInstanceCache cache) throws IOException {
 		if (fileName.startsWith("c")) {
 			return new ConstantIntervalFileObject(fileName, cache);
-		}
-		else if (fileName.startsWith("f")) {
+		} else if (fileName.startsWith("f")) {
 			return new FlexibleIntervalFileObject(fileName, cache);
-		}
-		else {
+		} else {
 			throw new IOException("Invalid filename for SlotsDB-File");
 		}
 	}
@@ -403,11 +420,9 @@ public abstract class FileObject {
 		System.out.println("getFileObject: " + file);
 		if (file.getName().startsWith("c")) {
 			return new ConstantIntervalFileObject(file, cache);
-		}
-		else if (file.getName().startsWith("f")) {
+		} else if (file.getName().startsWith("f")) {
 			return new FlexibleIntervalFileObject(file, cache);
-		}
-		else {
+		} else {
 			throw new IOException("Invalid file for SlotsDB-File. Invalid filename.");
 		}
 	}
