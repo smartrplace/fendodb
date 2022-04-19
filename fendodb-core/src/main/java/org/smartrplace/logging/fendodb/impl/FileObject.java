@@ -417,7 +417,6 @@ public abstract class FileObject {
 	}
 
 	public static FileObject getFileObject(File file, FendoInstanceCache cache) throws IOException {
-		System.out.println("getFileObject: " + file);
 		if (file.getName().startsWith("c")) {
 			return new ConstantIntervalFileObject(file, cache);
 		} else if (file.getName().startsWith("f")) {
