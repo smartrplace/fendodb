@@ -15,17 +15,18 @@
  */
 package org.smartrplace.logging.fendodb.impl;
 
-import java.io.BufferedOutputStream;
 import java.io.DataInputStream;
-import java.io.DataOutputStream;
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.UnsupportedEncodingException;
 import java.net.URLDecoder;
+import java.nio.ByteBuffer;
+import java.nio.channels.SeekableByteChannel;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -40,12 +41,8 @@ public abstract class FileObject {
 	protected Logger logger = LoggerFactory.getLogger(getClass());
 	protected long startTimeStamp = Long.MIN_VALUE; // byte 0-7 in file (cached)
 	protected long storagePeriod; // byte 8-15 in file (cached)
-	protected final File dataFile;
-	protected DataOutputStream dos;
-	protected BufferedOutputStream bos;
-	protected FileOutputStream fos;
-	protected DataInputStream dis;
-	protected FileInputStream fis;
+	protected final Path dataFile;
+	protected volatile SeekableByteChannel channel;
 	protected boolean canWrite;
 	protected volatile boolean canRead;
 
@@ -61,33 +58,22 @@ public abstract class FileObject {
 		canWrite = false;
 		canRead = false;
 		dataFile = getFileForName(filename);
-		length = dataFile.length();
-		if (dataFile.exists() && length >= 16) {
+		length = Files.exists(dataFile) ? Files.size(dataFile) : 0;
+		if (Files.exists(dataFile) && length >= 16) {
 			/*
 			 * File already exists -> get file Header (startTime and step-frequency) TODO: compare to starttime and
 			 * frequency in constructor! new file needed? update to file-array!
 			 */
-			try {
-				fis = new FileInputStream(dataFile);
-				try {
-					dis = new DataInputStream(fis);
+			enableInput();
+			synchronized(dataFile) {
+				try (InputStream fis = Files.newInputStream(dataFile);  DataInputStream dis = new DataInputStream(fis)) {
 					readHeader(dis);
-				} finally {
-					if (dis != null) {
-						dis.close();
-						dis = null;
-					}
-				}
-			} finally {
-				if (fis != null) {
-					fis.close();
-					fis = null;
 				}
 			}
 		}
 	}
 
-	private File getFileForName(String filename) {
+	private Path getFileForName(String filename) {
 		Path f = Paths.get(filename);
 		String label = f.getName(f.getNameCount() - 2).toString();
 		//FIXME only works for ogema labels
@@ -98,13 +84,13 @@ public abstract class FileObject {
 				try {
 					decodedLabel = URLDecoder.decode(label, "UTF-8");
 					if (decodedLabel.contains("/")) {
-						return base.resolve(decodedLabel).resolve(f.getFileName()).toFile();
+						return base.resolve(decodedLabel).resolve(f.getFileName());
 					}
 				} catch (UnsupportedEncodingException ex) {
 				}
 			}
 		}
-		return f.toFile();
+		return f;
 	}
 
 	/**
@@ -113,35 +99,24 @@ public abstract class FileObject {
 	 * @param dis2
 	 */
 	abstract void readHeader(DataInputStream dis) throws IOException;
-
+	
 	public FileObject(File file, FendoInstanceCache cache) throws IOException {
+		this(file.toPath(), cache);
+	}
+
+	public FileObject(Path file, FendoInstanceCache cache) throws IOException {
 		this.cache = cache;
 		canWrite = false;
 		canRead = false;
 		dataFile = file;
-		length = dataFile.length();
-		if (dataFile.exists() && length >= 16) {
+		length = Files.size(dataFile);
+		if (Files.exists(dataFile) && length >= 16) {
 			/*
 			 * File already exists -> get file Header (startTime and step-frequency)
 			 */
-			fis = new FileInputStream(dataFile);
-			try {
-				dis = new DataInputStream(fis);
-				try {
-					readHeader(dis);
-				} finally {
-					if (dis != null) {
-						dis.close();
-						dis = null;
-					}
-				}
-			} finally {
-				if (fis != null) {
-					fis.close();
-					fis = null;
-				}
+			try ( InputStream fis = Files.newInputStream(dataFile);  DataInputStream dis = new DataInputStream(fis)) {
+				readHeader(dis);
 			}
-
 		}
 	}
 
@@ -150,66 +125,42 @@ public abstract class FileObject {
 	 */
 	protected void enableOutput() throws IOException {
 		/*
-		 * Close Input Streams, for enabling output.
-		 */
-		if (dis != null) {
-			dis.close();
-			dis = null;
-		}
-		if (fis != null) {
-			fis.close();
-			fis = null;
-		}
-
-		/*
 		 * enabling output
 		 */
-		if (fos == null || dos == null || bos == null) {
-			fos = new FileOutputStream(dataFile, true);
-			bos = new BufferedOutputStream(fos);
-			dos = new DataOutputStream(bos);
+		if (canWrite) {
+			return;
 		}
-		canWrite = true;
-		canRead = false;
+		synchronized(dataFile) {
+			if (canWrite) {
+				return;
+			}
+			if (channel != null) {
+				channel.close();
+			}
+			channel = Files.newByteChannel(dataFile, StandardOpenOption.APPEND);
+					//Files.newByteChannel(dataFile, StandardOpenOption.WRITE);
+			canWrite = true;
+			canRead = false;
+		}
 	}
 
 	/*
 	 * Requires the SlotsDbStorage read lock to be held.
 	 */
-	protected void enableInput() throws IOException {
+	protected final void enableInput() throws IOException {
 		if (canRead) {
 			return;
 		}
-		synchronized (this) {
+		synchronized (dataFile) {
 			if (canRead) {
 				return;
 			}
-			/*
-			 * Close Output Streams for enabling input.
-			 */
-			if (dos != null) {
-				cache.invalidate();
-				assert cache.getCache() == null : "Invalidated cache is still alive";
-				dos.flush();
-				dos.close();
-				dos = null;
+			if (channel != null) {
+				channel.close();
 			}
-			if (bos != null) {
-				bos.close();
-				bos = null;
-			}
-			if (fos != null) {
-				fos.close();
-				fos = null;
-			}
-
-			/*
-			 * enabling input
-			 */
-			if (fis == null || dis == null) {
-				fis = new FileInputStream(dataFile);
-				dis = new DataInputStream(fis);
-			}
+			cache.invalidate();
+			assert cache.getCache() == null : "Invalidated cache is still alive";
+			channel = Files.newByteChannel(dataFile, StandardOpenOption.READ);
 			canWrite = false;
 			canRead = true;
 		}
@@ -220,14 +171,13 @@ public abstract class FileObject {
 	 *
 	 * @param startTimeStamp for file header
 	 */
-	public void createFileAndHeader(long startTimeStamp, long stepIntervall) throws IOException {
-		if (!dataFile.exists() || length < 16) {
-			dataFile.getParentFile().mkdirs();
-			if (dataFile.exists() && length < 16) {
-				dataFile.delete(); // file corrupted (header shorter that 16
+	synchronized void createFileAndHeader(long startTimeStamp, long stepIntervall) throws IOException {
+		if (!Files.exists(dataFile) || length < 16) {
+			Files.createDirectories(dataFile.getParent());
+			if (Files.exists(dataFile) && length < 16) {
+				Files.delete(dataFile); // file corrupted (header shorter that 16 bytes)
 			}
-			// bytes)
-			dataFile.createNewFile();
+			Files.createFile(dataFile);
 
 			//OLD 
 			//this.startTimeStamp = FileObjectProxy.getRoundedTimestamp(startTimeStamp, stepIntervall);
@@ -238,16 +188,14 @@ public abstract class FileObject {
 			/*
 			 * Do not close Output streams, because after writing the header -> data will follow!
 			 */
-			fos = new FileOutputStream(dataFile);
-			bos = new BufferedOutputStream(fos);
-			dos = new DataOutputStream(bos);
-			dos.writeLong(this.startTimeStamp);
-			dos.writeLong(stepIntervall);
-			dos.flush();
+			enableOutput();
+			ByteBuffer header = ByteBuffer.allocate(16);
+			header.putLong(this.startTimeStamp);
+			header.putLong(stepIntervall);
+			header.rewind();
+			channel.write(header);
 			length += 16;
 			/* wrote 2*8 Bytes */
-			canWrite = true;
-			canRead = false;
 		}
 	}
 
@@ -362,24 +310,15 @@ public abstract class FileObject {
 	 * @throws IOException
 	 */
 	public void close() throws IOException {
-		if (dos != null) {
+		if (canWrite) {
 			cache.invalidate();
 			assert cache.getCache() == null : "Invalidated cache is still alive";
-			dos.flush();
-			dos.close();
-			dos = null;
 		}
-		if (fos != null) {
-			fos.close();
-			fos = null;
-		}
-		if (dis != null) {
-			dis.close();
-			dis = null;
-		}
-		if (fis != null) {
-			fis.close();
-			fis = null;
+		synchronized (dataFile) {
+			if (channel != null) {
+				channel.close();
+				channel = null;
+			}
 		}
 		canRead = false;
 		canWrite = false;
@@ -391,10 +330,9 @@ public abstract class FileObject {
 	 * @throws IOException
 	 */
 	public void flush() throws IOException {
-		if (dos != null) {
+		if (channel != null) {
 			cache.invalidate();
 			assert cache.getCache() == null : "Invalidated cache is still alive";
-			dos.flush();
 		}
 	}
 
@@ -424,4 +362,20 @@ public abstract class FileObject {
 			throw new IOException("Invalid file for SlotsDB-File. Invalid filename.");
 		}
 	}
+	
+	public static FileObject getFileObject(Path file, FendoInstanceCache cache) throws IOException {
+		if (file.getFileName().toString().startsWith("c")) {
+			return new ConstantIntervalFileObject(file, cache);
+		} else if (file.getFileName().toString().startsWith("f")) {
+			return new FlexibleIntervalFileObject(file, cache);
+		} else {
+			throw new IOException("Invalid file for SlotsDB-File. Invalid filename.");
+		}
+	}
+
+	@Override
+	public String toString() {
+		return String.format("FileObject %s, read=%b, write=%b, start=%d", dataFile, canRead, canWrite, startTimeStamp);
+	}
+	
 }

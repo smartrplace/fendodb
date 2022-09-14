@@ -16,11 +16,12 @@
 package org.smartrplace.logging.fendodb.impl;
 
 import java.io.DataInputStream;
-import java.io.EOFException;
 import java.io.File;
 import java.io.IOException;
 import java.nio.Buffer;
 import java.nio.ByteBuffer;
+import java.nio.channels.SeekableByteChannel;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -30,6 +31,10 @@ import org.ogema.core.channelmanager.measurements.SampledValue;
 import org.smartrplace.logging.fendodb.impl.FendoCache.FendoInstanceCache;
 
 public class ConstantIntervalFileObject extends FileObject {
+	
+	protected ConstantIntervalFileObject(Path file, FendoInstanceCache cache) throws IOException {
+		super(file, cache);
+	}
 
 	protected ConstantIntervalFileObject(File file, FendoInstanceCache cache) throws IOException {
 		super(file, cache);
@@ -57,6 +62,7 @@ public class ConstantIntervalFileObject extends FileObject {
 	@Override
 	public void append(double value, long timestamp, byte flag) throws IOException {
 		long writePosition = getBytePosition(timestamp);
+		ByteBuffer buf = ByteBuffer.allocate(9);
 		if (writePosition == length) {
 			/*
 			 * value for this timeslot has not been saved yet "AND" some value has been stored in last timeslot
@@ -64,9 +70,13 @@ public class ConstantIntervalFileObject extends FileObject {
 			if (!canWrite) {
 				enableOutput();
 			}
-
-			dos.writeDouble(value);
-			dos.writeByte(flag);
+			buf.putDouble(value);
+			buf.put(flag);
+			buf.rewind();
+			synchronized(dataFile) {
+				channel.write(buf);
+			}
+			buf.clear();
 			length += 9;
 		}
 		else {
@@ -85,20 +95,27 @@ public class ConstantIntervalFileObject extends FileObject {
 				long rowsToFillWithNan = (writePosition - length) / 9;// TODO:
 				// stimmt
 				// Berechnung?
-				for (int i = 0; i < rowsToFillWithNan; i++) {
-					dos.writeDouble(Double.NaN); // TODO: festlegen welcher Wert
-					// undefined sein soll NaN
-					// ok?
-					dos.writeByte(Quality.BAD.getQuality()); // TODO:
-					// festlegen
-					// welcher Wert
-					// undefined sein
-					// soll 00 ok?
+				synchronized (dataFile) {
+					for (int i = 0; i < rowsToFillWithNan; i++) {
+						buf.putDouble(Double.NaN); // TODO: festlegen welcher Wert
+						// undefined sein soll NaN
+						// ok?
+						buf.put((byte) Quality.BAD.getQuality()); // TODO:
+						// festlegen
+						// welcher Wert
+						// undefined sein
+						// soll 00 ok?
+						buf.rewind();
+						channel.write(buf);
+						buf.clear();
+						length += 9;
+					}
+					buf.putDouble(value);
+					buf.put(flag);
+					buf.rewind();
+					channel.write(buf);
 					length += 9;
 				}
-				dos.writeDouble(value);
-				dos.writeByte(flag);
-				length += 9;
 			}
 		}
 		/*
@@ -164,16 +181,14 @@ public class ConstantIntervalFileObject extends FileObject {
 				if (!canRead) {
 					enableInput();
 				}
-				synchronized (this) {
-					fis.getChannel().position(getBytePosition(timestamp));
-					Double toReturn = dis.readDouble();
+				synchronized (dataFile) {
+					channel.position(getBytePosition(timestamp));
+					ByteBuffer data = ByteBuffer.allocate(9);
+					channel.read(data);
+					data.rewind();
+					Double toReturn = data.getDouble();
 					if (!Double.isNaN(toReturn)) {
-						try {
-							return new SampledValue(DoubleValues.of(toReturn), timestamp, Quality.getQuality(dis.readByte()));
-						} catch(EOFException e) {
-							logger.error("Caught EOFException reading from {}", dataFile.getPath(), e);
-							return null;
-						}
+						return new SampledValue(DoubleValues.of(toReturn), timestamp, Quality.getQuality(data.get()));
 					}
 				}
 			}
@@ -214,12 +229,11 @@ public class ConstantIntervalFileObject extends FileObject {
 			long timestampcounter = start;
 			long startPos = getBytePosition(start);
 			long endPos = getBytePosition(endRounded);
-			final byte[] b = new byte[(int) (endPos - startPos) + 9];
-			synchronized (this) {
-				fis.getChannel().position(startPos);
-				dis.read(b, 0, b.length);
+			//final byte[] b = new byte[(int) (endPos - startPos) + 9];
+			ByteBuffer bb = ByteBuffer.allocate((int) (endPos - startPos) + 9);
+			synchronized (dataFile) {
+				channel.position(startPos).read(bb);
 			}
-			ByteBuffer bb = ByteBuffer.wrap(b);
 			// casting is a hack to avoid incompatibility when building this on Java 9 and run on Java 8
 			// ByteBuffer#rewind used to return a Buffer in Jdk8, but from Java 9 on returns a ByteBuffer
 			((Buffer) bb).rewind();
@@ -260,12 +274,15 @@ public class ConstantIntervalFileObject extends FileObject {
 				if (!canRead) {
 					enableInput();
 				}
-				synchronized (this) {
-					fis.getChannel().position(getBytePosition(timestamp));
-					Double toReturn = dis.readDouble();
-					if (!Double.isNaN(toReturn)) {
-						return new SampledValue(DoubleValues.of(toReturn), timestamp, Quality.getQuality(dis.readByte()));
-					}
+				ByteBuffer data = ByteBuffer.allocate(9);
+				synchronized (dataFile) {
+					channel.position(getBytePosition(timestamp));					
+					channel.read(data);
+				}
+				data.flip();
+				Double toReturn = data.getDouble();
+				if (!Double.isNaN(toReturn)) {
+					return new SampledValue(DoubleValues.of(toReturn), timestamp, Quality.getQuality(data.get()));
 				}
 				timestamp += storagePeriod;
 			}
@@ -284,12 +301,15 @@ public class ConstantIntervalFileObject extends FileObject {
 				if (!canRead) {
 					enableInput();
 				}
-				synchronized (this) {
-					fis.getChannel().position(getBytePosition(timestamp));
-					Double toReturn = dis.readDouble();
-					if (!Double.isNaN(toReturn)) {
-						return new SampledValue(DoubleValues.of(toReturn), timestamp, Quality.getQuality(dis.readByte()));
-					}
+				ByteBuffer data = ByteBuffer.allocate(9);
+				synchronized (dataFile) {
+					channel.position(getBytePosition(timestamp));
+					channel.read(data);
+				}
+				data.rewind();
+				Double toReturn = data.getDouble();
+				if (!Double.isNaN(toReturn)) {
+					return new SampledValue(DoubleValues.of(toReturn), timestamp, Quality.getQuality(data.get()));
 				}
 				timestamp -= storagePeriod;
 			}

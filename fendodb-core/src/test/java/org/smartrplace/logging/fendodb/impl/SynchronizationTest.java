@@ -59,7 +59,7 @@ import org.smartrplace.logging.fendodb.impl.SlotsDb;
 
 public class SynchronizationTest extends FactoryTest {
 
-	private static final int SLOTS_PER_DAY = 1000;
+	private static final int SLOTS_PER_DAY = 100;
 	private final static boolean ignore = "true".equalsIgnoreCase(System.getenv("NO_LONG_TESTS")) || Boolean.getBoolean("NO_LONG_TESTS");
 	private static final AtomicInteger CNT = new AtomicInteger(0);
 	private static final RecordedDataConfiguration FLEXIBLE_CFG = new RecordedDataConfiguration();
@@ -68,7 +68,7 @@ public class SynchronizationTest extends FactoryTest {
 	static {
 		FLEXIBLE_CFG.setStorageType(StorageType.ON_VALUE_UPDATE);
 		CONSTANT_CFG.setStorageType(StorageType.FIXED_INTERVAL);
-		CONSTANT_CFG.setFixedInterval(10);
+		CONSTANT_CFG.setFixedInterval(ONE_DAY/SLOTS_PER_DAY);
 	}
 
 
@@ -370,7 +370,7 @@ public class SynchronizationTest extends FactoryTest {
 					.mapToObj(Integer::valueOf)
 					.collect(Collectors.toList());
 			final List<SampledValue> values = IntStream.range(0, nrDatapoints)
-				.mapToObj(i -> new SampledValue(new IntegerValue(expectedValues.get(i)), 20 * i + Math.round(Math.random()*4 - 2) , Quality.GOOD))
+				.mapToObj(i -> new SampledValue(new IntegerValue(expectedValues.get(i)), (ONE_DAY/SLOTS_PER_DAY) * i + Math.round(Math.random()*4 - 2) , Quality.GOOD))
 				.collect(Collectors.toList());
 			ts.insertValues(values);
 			final CountDownLatch threadsReady = new CountDownLatch(readerThreads);

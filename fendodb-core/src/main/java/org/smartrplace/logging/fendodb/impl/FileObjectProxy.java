@@ -15,10 +15,13 @@
  */
 package org.smartrplace.logging.fendodb.impl;
 
+import com.google.common.cache.CacheBuilder;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.io.UnsupportedEncodingException;
 import java.net.URLDecoder;
+import java.nio.file.FileSystem;
+import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -32,13 +35,18 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Timer;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ForkJoinPool;
+import java.util.concurrent.ForkJoinTask;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.logging.Level;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -71,7 +79,9 @@ public final class FileObjectProxy {
 	final String rootNodeString;
 	// remove values only when folder write lock is held.
 	// read lock is sufficient for adding values
-	final ConcurrentMap<String, FileObjectList> openFilesHM;
+	final Map<String, FileObjectList> openFilesHM;
+
+	Map<Path, FileSystem> zipFiles = new ConcurrentHashMap<>();
 	// concurrent map
 //	private final ConcurrentMap<String, String> encodedLabels = new ConcurrentHashMap<>();
 	final Timer timer;
@@ -190,6 +200,13 @@ public final class FileObjectProxy {
 		} finally {
 			folderLock.writeLock().unlock();
 		}
+		zipFiles.forEach((p,fs) -> {
+			try {
+				fs.close();
+			} catch (IOException ioex) {
+				logger.warn("zip filesystem close failed for {}: {}", p, ioex.getMessage());
+			}
+		});
 //		encodedLabels.clear();
 			
 	}
@@ -259,29 +276,55 @@ public final class FileObjectProxy {
 	/*
 	 * loads a sorted list of all days in SLOTSDB. Necessary for search- and delete jobs.
 	 */
-	private final static List<Path> loadDays(final Path rootNode, final boolean useCompatibilityMode) throws IOException {
+	private List<Path> loadDays(final Path rootNode, final boolean useCompatibilityMode) throws IOException {
 		try (final Stream<Path> stream = Files.list(rootNode)) {
-			return stream
-					.filter(f -> Files.isDirectory(f))
+			List<Path> rval = stream
+					//.filter(f -> Files.isDirectory(f))
 					.filter(f -> isDayFolder(f, useCompatibilityMode))
+					.map(f -> {
+						// for zipfiles, return the path inside the zip
+						if (f.toString().endsWith(".zip")) {
+							FileSystem zipfs = zipFiles.computeIfAbsent(f, zip -> {
+								try {
+									return FileSystems.newFileSystem(zip, FileObjectProxy.class.getClassLoader());
+								} catch (IOException ex) {
+									return null;
+								}
+							});
+							Path zippedDayPath = zipfs.getPath(getFolderDateString(f));
+							return zippedDayPath;
+						}
+						return f;
+					})
 					.sorted(!useCompatibilityMode ? daysComparator : daysComparatorCompat)
 					.collect(Collectors.toList());
+			if (!rval.isEmpty()) {
+				logger.debug("days loaded: {}, start={}, end={}", rval.size(), rval.get(0), rval.get(rval.size()-1));
+			} else {
+				logger.debug("no days found");
+			}
+			return rval;
 		}
 	}
 	
-	private final static boolean isDayFolder(final Path file, final boolean useCompatibilityMode) {
+	private static boolean isDayFolder(final Path file, final boolean useCompatibilityMode) {
 		try {
-			if (!useCompatibilityMode) 
-				Long.parseLong(file.getFileName().toString());
-			else
-				LocalDate.from(TimeUtils.formatter.parse(file.getFileName().toString()));
+			String filename = file.getFileName().toString();
+			if (filename.endsWith(".zip")) {
+				filename = filename.substring(0, filename.length()-4);
+			}
+			if (!useCompatibilityMode) {
+				Long.parseLong(filename);
+			} else {
+				LocalDate.from(TimeUtils.formatter.parse(filename));
+			}
 			return true;
 		} catch (Exception e) {
 			return false;
 		}
 	}
 	
-	private final static Comparator<Path> daysComparator = new Comparator<Path>() {
+	private static Comparator<Path> daysComparator = new Comparator<Path>() {
 		
 		@Override
 		public int compare(final Path o1, final Path o2) {
@@ -352,7 +395,7 @@ public final class FileObjectProxy {
 	}
 
 	private void appendValue(final String label, final double value, final long timestamp, final byte state,
-			final RecordedDataConfiguration configuration, boolean hasWriteLock) throws IOException {
+			final RecordedDataConfiguration configuration, boolean lockForWriting) throws IOException {
 
 		long storingPeriod;
 		if (configuration.getStorageType().equals(StorageType.FIXED_INTERVAL)) {
@@ -366,22 +409,20 @@ public final class FileObjectProxy {
 
 		FileObject toStoreIn = null;
 		final long strDate = TimeUtils.getCurrentStart(timestamp, unit);
+		//System.out.printf("timestamp=%d, strDate=%s%n", timestamp, strDate);
+		
+		final Lock lock = lockForWriting ? folderLock.writeLock() : folderLock.readLock();
+		boolean lockReleased = false;
 		
 		final boolean requiresNewFolder;
-		if (!hasWriteLock) 
-			folderLock.readLock().lock();
+		lock.lock();
 		try {
 			requiresNewFolder = !openFilesHM.containsKey(label + strDate)|| openFilesHM.get(label + strDate).size() == 0;
 			// in this case we need to abort the current operation and start again, this time holding the write lock
-			if (requiresNewFolder && !hasWriteLock) {
-				hasWriteLock = true; // required to avoid releasing the read lock twice (see finally block)
-				folderLock.readLock().unlock();
-				folderLock.writeLock().lock();
-				try {
-					appendValue(label, value, timestamp, state, configuration, true);
-				} finally {
-					folderLock.writeLock().unlock();
-				}
+			if (requiresNewFolder && !lockForWriting) {
+				lockReleased = true; // do not unlock again in finally
+				lock.unlock();
+				appendValue(label, value, timestamp, state, configuration, true);
 				return;
 			}
 
@@ -479,8 +520,9 @@ public final class FileObjectProxy {
 				}
 			}
 		} finally {
-			if (!hasWriteLock)
-				folderLock.readLock().unlock();
+			if (!lockReleased) {
+				lock.unlock();
+			}
 		}
 	}
 
@@ -543,27 +585,29 @@ public final class FileObjectProxy {
 	//current day
 	public SampledValue readNextValue(final String label, final long t, final RecordedDataConfiguration configuration)
 			throws IOException {
-		long timestamp = t; //getRoundedTimestamp(t, configuration);
-		//			List<FileObjectList> days = getFoldersForIntervalSorted(label, timestamp, Long.MAX_VALUE);
-		//			if(days.isEmpty()) return null;
+		long timestamp = t;
 		FileObjectList folder;
 		SampledValue result = null;
 		folderLock.readLock().lock();
 		try {
-			 folder = getNextFolder(label, timestamp, true);
-		
-			//				List<FileObject> folList = days.get(0).getFileObjectsStartingAt(timestamp);
-			if (folder == null)
+			folder = getNextFolder(label, timestamp, true);
+			if (folder == null) {
+				//System.out.printf("%s readNextValue(%s, %d) = null [0](no folder)%n", Thread.currentThread().getName(), label, t);
 				return null;
+			}
 			List<FileObject> folList = folder.getFileObjectsStartingAt(timestamp);
 			while (folList.isEmpty()) {
 				//check next day // XXX should probably not happen
 				folder = getNextFolder(label, folder, false);
-				if (folder == null)
+				if (folder == null) {
+					//System.out.printf("%s readNextValue(%s, %d) = null [1](no folder)%n", Thread.currentThread().getName(), label, t);
 					return null;
+				}
 				folList = folder.getFileObjectsStartingAt(timestamp);
-				if (folList == null)
+				if (folList == null) {
+					//System.out.printf("%s readNextValue(%s, %d) = null [2](no folder)%n", Thread.currentThread().getName(), label, t);
 					return null;
+				}
 			}
 			FileObject toReadFrom = null;
 			long minTime = Long.MAX_VALUE;
@@ -580,9 +624,8 @@ public final class FileObjectProxy {
 				timestamp = Math.max(timestamp,toReadFrom.getStartTimeStamp());
 				result = toReadFrom.read(timestamp);
 				if (result == null) {
-					result = toReadFrom.readNextValue(timestamp); // null if no value for timestamp
-			}
-			// is available
+					result = toReadFrom.readNextValue(timestamp); // null if no value for timestamp is available
+				}
 			}
 		} finally {
 			folderLock.readLock().unlock();
@@ -598,6 +641,7 @@ public final class FileObjectProxy {
 			return readNextValue(label, timestamp, configuration);
 		}
 		
+		//System.out.printf("%s readNextValue(%s, %d) = %s [3]%n", Thread.currentThread().getName(), label, t, result);
 		return result;
 	
 	}
@@ -717,7 +761,7 @@ public final class FileObjectProxy {
 	// requires folder read lock 
 	private List<FileObjectList> getFoldersForIntervalSorted(final String label, final long start, final long end) throws IOException {
 		final long foldersStart = start == Long.MIN_VALUE ? start : TimeUtils.getCurrentStart(start, unit);
-		return days.stream()
+		return days.parallelStream()
 			.filter(day -> isFolderBetweenStartAndEnd(day, foldersStart, end, useCompatibilityMode))
 			.map(day -> day.resolve(label))
 			.filter(subfolder -> Files.isDirectory(subfolder))
@@ -725,43 +769,6 @@ public final class FileObjectProxy {
 			.map(subfolder -> getFileObjectList(subfolder.getParent(), label))
 			.filter(fol -> fol != null)
 			.collect(Collectors.toList());
-		
-		/*
-		 * Check for Folders matching criteria: Folder contains data between start & end timestamp. Folder contains
-		 * label.
-		 */
-//		String strSubfolder;
-//		
-//		
-//		for (File folder : rootNode.listFiles()) {
-//			if (folder.isDirectory()) {
-//				if (isFolderBetweenStartAndEnd(folder.getName(), start, end)) {
-//					if (Arrays.asList(folder.list()).contains(label)) {
-//						strSubfolder = rootNodeString + "/" + folder.getName() + "/" + label;
-//						days.add(new FileObjectList(strSubfolder, cache, label));
-//						logger.trace(strSubfolder + " contains " + SlotsDb.FILE_EXTENSION + " files to read from.");
-//					}
-////					else if (Arrays.asList(folder.list()).contains(URLEncoder.encode(label,"UTF-8"))) {
-////						strSubfolder = rootNodeString + "/" + folder.getName() + "/" + URLEncoder.encode(label,"UTF-8");
-////						days.add(new FileObjectList(strSubfolder, cache, label));
-////						logger.trace(strSubfolder + " contains " + SlotsDb.FILE_EXTENSION + " files to read from.");
-////					}
-//				}
-//			}
-//		}
-//		/*
-//		 * Sort days, because rootNode.listFiles() is unsorted. FileObjectLists MUST be sorted, otherwise data
-//		 * output wouldn't be sorted.
-//		 */
-//		Collections.sort(days, new Comparator<FileObjectList>() {
-//
-//			@Override
-//			public int compare(FileObjectList f1, FileObjectList f2) {
-//				return Long.valueOf(f1.getFirstTS()).compareTo(f2.getFirstTS());
-//			}
-//		});
-//
-//		return days;
 	}
 	
 	
@@ -775,8 +782,10 @@ public final class FileObjectProxy {
 			.filter(subfolder -> Files.isDirectory(subfolder))
 			.sorted(getParentDirComparator())
 			.findFirst();
-		if (!opt.isPresent())
+		//System.out.printf("%s getNextFolder(%s, %d): opt=%s%n", Thread.currentThread().getName(), label, start, opt);
+		if (!opt.isPresent()) {
 			return null;
+		}
 		final Path folder = opt.get();
 		return getFileObjectList(folder.getParent(), label);
 		
@@ -823,44 +832,6 @@ public final class FileObjectProxy {
 			logger.error("Failed to parse folder list {}", folder, e);
 			return null;
 		}
-//		String currentDate = folder.getFolderName();
-//		int lastIdx = currentDate.lastIndexOf('/');
-//		if (lastIdx < 0)
-//			lastIdx = currentDate.lastIndexOf('\\');
-//		if (lastIdx < 0) // XXX isn't his an error?
-//			return null;
-//		currentDate = currentDate.substring(0, lastIdx);
-//		final Path current = Paths.get(currentDate);
-//		List<File> folders = Arrays.asList(rootNode.listFiles());
-//		Collections.sort(folders);
-//		File f;
-//		int i = Integer.MIN_VALUE;
-//		for (int idx = 0; idx < folders.size(); idx++) {
-//			f = folders.get(idx);
-//			if (Files.isSameFile(current, Paths.get(f.toString()))) {
-//				i = idx;
-//				break;
-//			}
-//		}
-//		if (i < 0)
-//			return null;
-//		for (int j=i+1;j<folders.size();j++) {
-//			f = folders.get(j);
-//			if (f.isDirectory() && Arrays.asList(f.list()).contains(label)) {
-//				String strSubfolder = rootNodeString + "/" + f.getName() + "/" + label;
-//				if (logger.isTraceEnabled())
-//					logger.trace(strSubfolder + " contains " + SlotsDb.FILE_EXTENSION + " files to read from.");
-//				return new FileObjectList(strSubfolder, cache, label);
-//			} else if (f.isDirectory() && Arrays.asList(f.list()).contains(URLEncoder.encode(label,"UTF-8"))) {
-//				String strSubfolder = rootNodeString + "/" + f.getName() + "/" + URLEncoder.encode(label,"UTF-8");
-//				if (logger.isTraceEnabled())
-//					logger.trace(strSubfolder + " contains " + SlotsDb.FILE_EXTENSION + " files to read from.");
-//				return new FileObjectList(strSubfolder, cache, label);
-//			}
-//		}
-//		
-//		return null;
-//		
 	}
 	
 	static List<SampledValue> readFolder(final FileObjectList folder) throws IOException {
@@ -974,6 +945,15 @@ public final class FileObjectProxy {
 			logger.trace("Selected " + SlotsDb.FILE_EXTENSION + " files contain " + toReturn.size() + " Values.");
 		return toReturn;
 	}
+	
+	static String getFolderDateString(Path folder) {
+		String folderName = folder.getFileName().toString();
+		if (folderName.endsWith(".zip")) {
+			return folderName.substring(0, folderName.length()-4);
+		} else {
+			return folderName;
+		}
+	}
 
 	/**
 	 * Parses a Timestamp in Milliseconds from a String in yyyyMMdd Format <br>
@@ -989,7 +969,7 @@ public final class FileObjectProxy {
 	 */
 	private static final boolean isFolderBetweenStartAndEnd(final Path name, final long start, final long end, final boolean useCompatibilityMode) {
 		final long folderStart;
-		final String folderName = name.getFileName().toString();
+		String folderName = getFolderDateString(name);
 		try {
 			folderStart = !useCompatibilityMode ? Long.parseLong(folderName) : TimeUtils.parseCompatibilityFolderName(folderName);
 		} catch (NumberFormatException | DateTimeException e) {
@@ -1018,7 +998,7 @@ public final class FileObjectProxy {
 //		return false;
 	}
 	
-	private final FileObjectList getFileObjectList(final Path dayFolder, final String label) {
+	private FileObjectList getFileObjectList(final Path dayFolder, final String label) {
 		try {
 			final long dayStr = !useCompatibilityMode ? Long.parseLong(dayFolder.getFileName().toString()) : 
 				TimeUtils.parseCompatibilityFolderName(dayFolder.getFileName().toString());
@@ -1045,10 +1025,19 @@ public final class FileObjectProxy {
 					? URLDecoder.decode(label, "UTF-8")
 					: label;
 			
-			return openFilesHM.computeIfAbsent(id, key -> {
+			FileObjectList rval = openFilesHM.computeIfAbsent(id, _key -> {
 				try {
 					controlHashtableSize();
 					String dayFolderName = getDayFolderName(day);
+
+					Path zipPath = isZipped(dayFolderName, label);
+					if (zipPath != null) {
+						logger.debug("found zipped data for {}/{}: {}", day, label, zipPath);
+						return new FileObjectList(zipPath,
+							rootNodeString + "/" + dayFolderName + "/" + labelFsPath,
+							dayFolderName, cache, label, useCompatibilityMode);
+					}
+
 					return new FileObjectList(
 							rootNodeString + "/" + dayFolderName + "/" + labelFsPath,
 							dayFolderName, cache, label, useCompatibilityMode);
@@ -1057,11 +1046,33 @@ public final class FileObjectProxy {
 					return null;
 				}
 			});
+			//System.out.printf("%s getFileObjectList(%d, %s) = %s%n", Thread.currentThread().getName(), day, label, rval);
+			return rval;
 		} catch (UnsupportedEncodingException ex) {
 			return null;
 		}
 	}
 	
+	Path isZipped(String day, String label) throws IOException {
+		Path zipFile = Path.of(rootNodeString, day + ".zip");
+		if (!Files.exists(zipFile)) {
+			return null;
+		}
+		if (zipFiles.containsKey(zipFile)) {
+			return zipFiles.get(zipFile).getPath(day, label);
+		}
+		FileSystem zipfs = zipFiles.get(zipFile);
+		if (zipfs == null) {
+			zipfs = FileSystems.newFileSystem(zipFile, getClass().getClassLoader());
+			// keep open zip files in map, zip path from closed zip fs will not work
+			zipFiles.put(zipFile, zipfs);
+		}
+		Path dataseriesZipPath = zipfs.getPath(day, label);
+		if (Files.exists(dataseriesZipPath)) {
+			return dataseriesZipPath;
+		}
+		return null;
+	}
 	
 	/*
 	 * strCurrentDay holds the current Day in yyyyMMdd format, because SimpleDateFormat uses a lot cpu-time.
@@ -1121,6 +1132,8 @@ public final class FileObjectProxy {
 		}
 	}
 	
+	volatile ForkJoinTask<Void> sizeControlTask;
+	
 	private void controlHashtableSize() {
 		/*
 		 * hm.size() doesn't really represent the number of open files, because it contains FileObjectLists, which may
@@ -1130,18 +1143,24 @@ public final class FileObjectProxy {
 		 */
 		if (openFilesHM.size() < max_open_files)
 			return;
+		if (sizeControlTask != null && !sizeControlTask.isDone()) {
+			return;
+		}
 		// execute in new thread to avoid deadlock due to read lock being held
-		ForkJoinPool.commonPool().submit(() -> {
-			folderLock.writeLock().lock();
-			try {
-				if (openFilesHM.size() < max_open_files) // double checked locking, simply to avoid running this too often
-					return;
-				controlHashtableSizeInternal();
-			} catch (IOException e) {
-				logger.error("Failed to close file?", e);
-			} finally {
-				folderLock.writeLock().unlock();
+		sizeControlTask = ForkJoinPool.commonPool().submit(() -> {
+			if (folderLock.writeLock().tryLock(5, TimeUnit.SECONDS)) {
+				try {
+					if (openFilesHM.size() < max_open_files) { // double checked locking, simply to avoid running this too often
+						return null;
+					}
+					controlHashtableSizeInternal();
+				} catch (IOException e) {
+					logger.error("Failed to close file?", e);
+				} finally {
+					folderLock.writeLock().unlock();
+				}
 			}
+			return null;
 		});
 	}
 	

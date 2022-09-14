@@ -15,11 +15,16 @@
  */
 package org.smartrplace.logging.fendodb.impl;
 
-import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Vector;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Class representing a folder in a SlotsDatabase.<br>
@@ -37,6 +42,7 @@ import java.util.Vector;
  */
 public final class FileObjectList {
 
+	private final static Logger LOGGER = LoggerFactory.getLogger(FileObjectList.class);
 	// synchronized by read-write lock of the respective SlotsDbStorage
 	// adding a file requires a write lock, reading requires a read lock
 	private List<FileObject> files;
@@ -45,6 +51,17 @@ public final class FileObjectList {
 	private long firstTS;
 	private int size;
 	private final boolean useCompatibilityMode;
+	
+	
+	private Path basePath;
+	FileObjectList(Path basePath, String foldername, String dayFolderName, FendoCache cache, String encodedId, boolean useCompatibilityMode) throws IOException {
+		// File folder = new File(foldername);
+		this.foldername = foldername;
+		this.dayFolderName = dayFolderName;
+		this.useCompatibilityMode = useCompatibilityMode;
+		this.basePath = basePath;
+		reLoadFolder(cache, encodedId);
+	}
 	
 	/**
 	 * Creates a FileObjectList<br>
@@ -64,6 +81,10 @@ public final class FileObjectList {
 	public String getFolderName() {
 		return foldername;
 	}
+	
+	private Path getBasePath() {
+		return basePath != null ? basePath : Path.of(foldername);
+	}
 
 	/**
 	 * Reloads the List; requires folder read lock (see FileObjectProxy)
@@ -71,51 +92,51 @@ public final class FileObjectList {
 	 * @throws IOException
 	 */
 	final void reLoadFolder(final FendoCache cache, final String encodedId) throws IOException {
-		
-		File folder = new File(foldername);
-
+		Path folder = getBasePath();
 		files = new ArrayList<>(1);
-		if (folder.isDirectory()) {
-			for (File file : folder.listFiles()) {
-				if (file.length() >= 16) { // otherwise is corrupted or empty
-					// file.
-					final String filename = file.getName();
-					String[] split = filename.split("\\.");
-					if (("." + split[split.length - 1]).equals(SlotsDb.FILE_EXTENSION)) {
-						files.add(FileObject.getFileObject(file, cache.getCache(encodedId, filename)));
+		if (Files.isDirectory(folder)) {
+			// stream obtained with Files#list *must* be closed or leaks file handle (to directory)
+			try ( Stream<Path> s = Files.list(folder)) {
+				for (Path file : s.collect(Collectors.toList())) {
+					final String filename = file.getFileName().toString();
+					if (filename.endsWith(SlotsDb.FILE_EXTENSION)) {
+						if (Files.size(file) >= 16) {
+							files.add(FileObject.getFileObject(file, cache.getCache(encodedId, filename)));
+						} else { // corrupted or empty
+							Files.delete(file);
+						}
 					}
 				}
-				else {
-					file.delete();
+			}
+			/*
+			for (Path file : Files.list(folder).collect(Collectors.toList())) {
+				final String filename = file.getFileName().toString();
+				if (filename.endsWith(SlotsDb.FILE_EXTENSION)) {
+					if (Files.size(file) >= 16) {
+						files.add(FileObject.getFileObject(file, cache.getCache(encodedId, filename)));
+					} else { // corrupted or empty
+						Files.delete(file);
+					}
 				}
 			}
+			*/
 			if (files.size() > 1) {
 				sortList(files);
 			}
 		}
-
-		size = files.size();
-
+		size = files.size();		
+		LOGGER.trace("reloadFolder: {}, {}", folder, size);
 		/*
 		 * set first Timestamp for this FileObjectList if there are no files -> first TS = TS@ 00:00:00 o'clock.
 		 */
 		if (size == 0) {
 			firstTS = !useCompatibilityMode ? Long.parseLong(dayFolderName)
 					: TimeUtils.parseCompatibilityFolderName(dayFolderName);
-//			
-//			SimpleDateFormat sdf = new SimpleDateFormat("yyyyMMdd");
-//			try {
-//				sdf.parse(folder.getParentFile().getName());
-//			} catch (ParseException e) {
-//				throw new IOException("Unable to parse Timestamp from folder: " + folder.getParentFile().getName()
-//						+ ". Expected Folder in yyyyMMdd Format!");
-//			}
-//			firstTS = sdf.getCalendar().getTimeInMillis();
 		}
 		else {
 			firstTS = files.get(0).getStartTimeStamp();
 		}
-		folder = null;
+		//System.out.printf("%s reloadFolder(%s) = %s%n", Thread.currentThread().getName(), folder, files);
 	}
 
 	/*
@@ -291,6 +312,6 @@ public final class FileObjectList {
 	
 	@Override
 	public String toString() {
-		return "FileObjectList: " + foldername;
+		return "FileObjectList '" + foldername + "': " + files;
 	}
 }
