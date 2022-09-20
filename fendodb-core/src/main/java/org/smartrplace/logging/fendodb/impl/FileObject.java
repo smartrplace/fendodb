@@ -65,7 +65,7 @@ public abstract class FileObject {
 			 * frequency in constructor! new file needed? update to file-array!
 			 */
 			enableInput();
-			synchronized(dataFile) {
+			synchronized(this) {
 				try (InputStream fis = Files.newInputStream(dataFile);  DataInputStream dis = new DataInputStream(fis)) {
 					readHeader(dis);
 				}
@@ -130,7 +130,7 @@ public abstract class FileObject {
 		if (canWrite) {
 			return;
 		}
-		synchronized(dataFile) {
+		synchronized(this) {
 			if (canWrite) {
 				return;
 			}
@@ -151,7 +151,7 @@ public abstract class FileObject {
 		if (canRead) {
 			return;
 		}
-		synchronized (dataFile) {
+		synchronized(this) {
 			if (canRead) {
 				return;
 			}
@@ -314,7 +314,7 @@ public abstract class FileObject {
 			cache.invalidate();
 			assert cache.getCache() == null : "Invalidated cache is still alive";
 		}
-		synchronized (dataFile) {
+		synchronized(this) {
 			if (channel != null) {
 				channel.close();
 				channel = null;

@@ -93,7 +93,7 @@ public class FlexibleIntervalFileObject extends FileObject {
 			buf.put(flag);
 			buf.rewind();
 			//channel.write(buf);
-			synchronized(dataFile) {
+			synchronized(this) {
 				channel.position(length).write(buf);
 			}
 			lastTimestamp = timestamp;
@@ -124,7 +124,7 @@ public class FlexibleIntervalFileObject extends FileObject {
 					enableInput();
 				}
 				ByteBuffer bb = ByteBuffer.allocate(8);
-				synchronized (dataFile) {
+				synchronized (this) {
 					channel.position((dataSetCount - 1) * DATASETSIZE + HEADERSIZE);					
 					channel.read(bb);
 				}
@@ -152,7 +152,7 @@ public class FlexibleIntervalFileObject extends FileObject {
 		long startpos = HEADERSIZE;
 		final byte[] b = new byte[(int) (length - HEADERSIZE)];
 		ByteBuffer bb = ByteBuffer.wrap(b);
-		synchronized (dataFile) {
+		synchronized (this) {
 			channel.position(startpos).read(bb);
 		}
 		// casting is a hack to avoid incompatibility when building this on Java 9 and run on Java 8
@@ -185,7 +185,7 @@ public class FlexibleIntervalFileObject extends FileObject {
 		long startpos = HEADERSIZE;
 		final byte[] b = new byte[(int) (length - HEADERSIZE)];
 		ByteBuffer bb = ByteBuffer.wrap(b);
-		synchronized (dataFile) {
+		synchronized (this) {
 			channel.position(startpos).read(bb);
 		}
 		// casting is a hack to avoid incompatibility when building this on Java 9 and run on Java 8
@@ -215,7 +215,7 @@ public class FlexibleIntervalFileObject extends FileObject {
 		final byte[] b = new byte[(int) (length - HEADERSIZE)];
 		ByteBuffer bb = ByteBuffer.wrap(b);
 		int read;
-		synchronized (dataFile) {
+		synchronized (this) {
 			read = channel.position(startpos).read(bb);
 		}
 		// casting is a hack to avoid incompatibility when building this on Java 9 and run on Java 8
@@ -250,14 +250,12 @@ public class FlexibleIntervalFileObject extends FileObject {
 			enableInput();
 		}
 		long startpos = HEADERSIZE;
-		final byte[] b = new byte[(int) (length - HEADERSIZE)];
-		ByteBuffer bb = ByteBuffer.wrap(b);
+		ByteBuffer bb = ByteBuffer.allocate((int) (length - HEADERSIZE));
 		final int countOfDataSets = getDataSetCountInternal();
-		int read;
 
-		synchronized (dataFile) {
-			read = channel.position(startpos).read(bb);
-		}		
+		synchronized (this) {
+			channel.position(startpos).read(bb);
+		}
 		// casting is a hack to avoid incompatibility when building this on Java 9 and run on Java 8
 		// ByteBuffer#rewind used to return a Buffer in Jdk8, but from Java 9 on returns a ByteBuffer
 		((Buffer) bb).flip();
@@ -282,7 +280,7 @@ public class FlexibleIntervalFileObject extends FileObject {
 		if (!canRead) {
 			enableInput();
 		}
-		synchronized (dataFile) {
+		synchronized (this) {
 			SeekableByteChannel in = channel.position(HEADERSIZE);
 			ByteBuffer dsbuf = ByteBuffer.allocate(17);
 			final int countOfDataSets = getDataSetCountInternal();
@@ -329,7 +327,7 @@ public class FlexibleIntervalFileObject extends FileObject {
 		long startpos = HEADERSIZE;
 		final byte[] b = new byte[(int) (length - HEADERSIZE)];
 		ByteBuffer bb = ByteBuffer.wrap(b);
-		synchronized (dataFile) {
+		synchronized (this) {
 			channel.position(startpos).read(bb);
 		}
 		// casting is a hack to avoid incompatibility when building this on Java 9 and run on Java 8

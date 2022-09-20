@@ -73,7 +73,7 @@ public class ConstantIntervalFileObject extends FileObject {
 			buf.putDouble(value);
 			buf.put(flag);
 			buf.rewind();
-			synchronized(dataFile) {
+			synchronized (this) {
 				channel.write(buf);
 			}
 			buf.clear();
@@ -95,7 +95,7 @@ public class ConstantIntervalFileObject extends FileObject {
 				long rowsToFillWithNan = (writePosition - length) / 9;// TODO:
 				// stimmt
 				// Berechnung?
-				synchronized (dataFile) {
+				synchronized (this) {
 					for (int i = 0; i < rowsToFillWithNan; i++) {
 						buf.putDouble(Double.NaN); // TODO: festlegen welcher Wert
 						// undefined sein soll NaN
@@ -181,7 +181,7 @@ public class ConstantIntervalFileObject extends FileObject {
 				if (!canRead) {
 					enableInput();
 				}
-				synchronized (dataFile) {
+				synchronized (this) {
 					channel.position(getBytePosition(timestamp));
 					ByteBuffer data = ByteBuffer.allocate(9);
 					channel.read(data);
@@ -231,7 +231,7 @@ public class ConstantIntervalFileObject extends FileObject {
 			long endPos = getBytePosition(endRounded);
 			//final byte[] b = new byte[(int) (endPos - startPos) + 9];
 			ByteBuffer bb = ByteBuffer.allocate((int) (endPos - startPos) + 9);
-			synchronized (dataFile) {
+			synchronized (this) {
 				channel.position(startPos).read(bb);
 			}
 			// casting is a hack to avoid incompatibility when building this on Java 9 and run on Java 8
@@ -275,7 +275,7 @@ public class ConstantIntervalFileObject extends FileObject {
 					enableInput();
 				}
 				ByteBuffer data = ByteBuffer.allocate(9);
-				synchronized (dataFile) {
+				synchronized (this) {
 					channel.position(getBytePosition(timestamp));					
 					channel.read(data);
 				}
@@ -302,7 +302,7 @@ public class ConstantIntervalFileObject extends FileObject {
 					enableInput();
 				}
 				ByteBuffer data = ByteBuffer.allocate(9);
-				synchronized (dataFile) {
+				synchronized (this) {
 					channel.position(getBytePosition(timestamp));
 					channel.read(data);
 				}

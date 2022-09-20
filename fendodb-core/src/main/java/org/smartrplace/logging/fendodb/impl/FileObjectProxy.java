@@ -15,7 +15,9 @@
  */
 package org.smartrplace.logging.fendodb.impl;
 
+import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
+import com.google.common.cache.RemovalListener;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.io.UnsupportedEncodingException;
@@ -39,14 +41,11 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Timer;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.ForkJoinPool;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ForkJoinTask;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
-import java.util.logging.Level;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -79,7 +78,7 @@ public final class FileObjectProxy {
 	final String rootNodeString;
 	// remove values only when folder write lock is held.
 	// read lock is sufficient for adding values
-	final Map<String, FileObjectList> openFilesHM;
+	final Cache<String, FileObjectList> openFilesHM;
 
 	Map<Path, FileSystem> zipFiles = new ConcurrentHashMap<>();
 	// concurrent map
@@ -135,7 +134,6 @@ public final class FileObjectProxy {
 		logger.info("Storing to: {}", rootNodePath);
 		rootNode = rootNodePath;
 		rootNodeString = rootNodePath.toString();
-		openFilesHM = new ConcurrentHashMap<>();
 		days = loadDays(rootNodePath, useCompatibilityMode);
 		// FIXME if opened in read only mode, no tasks are needed
 		final long flushPeriod = config.getFlushPeriod();
@@ -180,6 +178,18 @@ public final class FileObjectProxy {
 
 		final int maxOpen = config.getMaxOpenFolders();
 		max_open_files = maxOpen >= 8 ? maxOpen : 8;
+		
+		RemovalListener<String, FileObjectList> reml = rn -> {
+			try {
+				logger.trace("open files cache: removed list for id {}", rn.getKey());
+				rn.getValue().closeAllFiles();
+			} catch (IOException ioex) {
+				logger.debug("exception closing files on evicted cache element", ioex);
+			}
+		};
+		openFilesHM = CacheBuilder.<String, FileObjectList>newBuilder().maximumSize(max_open_files)
+				.removalListener(reml).build();
+
 		logger.info("Maximum open Files for Database changed to: " + max_open_files);
 	}
 	
@@ -417,7 +427,8 @@ public final class FileObjectProxy {
 		final boolean requiresNewFolder;
 		lock.lock();
 		try {
-			requiresNewFolder = !openFilesHM.containsKey(label + strDate)|| openFilesHM.get(label + strDate).size() == 0;
+			FileObjectList cachedList = openFilesHM.getIfPresent(label + strDate);
+			requiresNewFolder = cachedList == null || cachedList.size() == 0;
 			// in this case we need to abort the current operation and start again, this time holding the write lock
 			if (requiresNewFolder && !lockForWriting) {
 				lockReleased = true; // do not unlock again in finally
@@ -467,7 +478,7 @@ public final class FileObjectProxy {
 			/*
 			 * There is a FileObjectList for this day.
 			 */
-			final FileObjectList listToStoreIn = openFilesHM.get(label + strDate);
+			final FileObjectList listToStoreIn = openFilesHM.getIfPresent(label + strDate);
 			if (listToStoreIn.size() > 0) {
 				toStoreIn = listToStoreIn.getCurrentFileObject();
 	
@@ -1025,11 +1036,12 @@ public final class FileObjectProxy {
 					? URLDecoder.decode(label, "UTF-8")
 					: label;
 			
-			FileObjectList rval = openFilesHM.computeIfAbsent(id, _key -> {
+			FileObjectList rval = openFilesHM.get(id, () -> {
 				try {
 					controlHashtableSize();
 					String dayFolderName = getDayFolderName(day);
 
+					logger.trace("creating and caching list for id {}, cache size={}", id, openFilesHM.size());
 					Path zipPath = isZipped(dayFolderName, label);
 					if (zipPath != null) {
 						logger.debug("found zipped data for {}/{}: {}", day, label, zipPath);
@@ -1048,6 +1060,9 @@ public final class FileObjectProxy {
 			});
 			//System.out.printf("%s getFileObjectList(%d, %s) = %s%n", Thread.currentThread().getName(), day, label, rval);
 			return rval;
+		} catch (ExecutionException ee) {
+			logger.warn("exception", ee);
+			return null;
 		} catch (UnsupportedEncodingException ex) {
 			return null;
 		}
@@ -1103,11 +1118,11 @@ public final class FileObjectProxy {
 	 * requires folder write lock
 	 */
 	void clearOpenFilesHashMap() throws IOException {
-		Iterator<FileObjectList> itr = openFilesHM.values().iterator();
+		Iterator<FileObjectList> itr = openFilesHM.asMap().values().iterator();
 		while (itr.hasNext()) { // kick out everything
 			itr.next().closeAllFiles();
 		}
-		openFilesHM.clear();
+		openFilesHM.invalidateAll();
 	}
 	
 	void clearCache() {
@@ -1141,11 +1156,13 @@ public final class FileObjectProxy {
 		 * storage Intervall is reconfigured. Continuous reconfiguring of measurement points may lead to a
 		 * "Too many open files" Exception. In this case SlotsDb.MAX_OPEN_FOLDERS should be decreased...
 		 */
+		
 		if (openFilesHM.size() < max_open_files)
 			return;
 		if (sizeControlTask != null && !sizeControlTask.isDone()) {
 			return;
 		}
+		/*
 		// execute in new thread to avoid deadlock due to read lock being held
 		sizeControlTask = ForkJoinPool.commonPool().submit(() -> {
 			if (folderLock.writeLock().tryLock(5, TimeUnit.SECONDS)) {
@@ -1162,21 +1179,7 @@ public final class FileObjectProxy {
 			}
 			return null;
 		});
-	}
-	
-
-	/** 
-	 * requires folder write lock 
-	 */
-	private void controlHashtableSizeInternal() throws IOException {
-		logger.debug("More then {} DataStreams are opened. Flushing and closing some to not exceed OS-Limit.", max_open_files);
-		Iterator<FileObjectList> itr = openFilesHM.values().iterator();
-		for (int i = 0; i < (openFilesHM.size() / 4); i++) { 
-			// randomly kick out some of the FileObjectLists.
-			// -> the needed ones will be reinitialized, no problem here.
-			itr.next().closeAllFiles();
-			itr.remove();
-		}
+		*/
 	}
 	
 	private final String getDayFolderName(final long timestamp) {
@@ -1184,7 +1187,7 @@ public final class FileObjectProxy {
 	}
 	
 	int openFolders() {
-		return openFilesHM.size();
+		return (int) openFilesHM.size();
 	}
 	
 }

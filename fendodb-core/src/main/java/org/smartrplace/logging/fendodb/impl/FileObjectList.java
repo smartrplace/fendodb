@@ -108,18 +108,6 @@ public final class FileObjectList {
 					}
 				}
 			}
-			/*
-			for (Path file : Files.list(folder).collect(Collectors.toList())) {
-				final String filename = file.getFileName().toString();
-				if (filename.endsWith(SlotsDb.FILE_EXTENSION)) {
-					if (Files.size(file) >= 16) {
-						files.add(FileObject.getFileObject(file, cache.getCache(encodedId, filename)));
-					} else { // corrupted or empty
-						Files.delete(file);
-					}
-				}
-			}
-			*/
 			if (files.size() > 1) {
 				sortList(files);
 			}

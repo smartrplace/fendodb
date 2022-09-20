@@ -126,7 +126,7 @@ abstract class InfoTask extends TimerTask {
 		
 		@Override
 		void runInternal() throws IOException {
-			Iterator<FileObjectList> itr = proxy.openFilesHM.values().iterator();
+			Iterator<FileObjectList> itr = proxy.openFilesHM.asMap().values().iterator();
 			while (itr.hasNext()) {
 				itr.next().flush();
 			}
