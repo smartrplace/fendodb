@@ -98,14 +98,34 @@ public class GetValuesArgumentTest extends DbTest {
 	 */
 	@Test
 	public void testLargeRequestArguments() {
-		List<SampledValue> values = rds.getValues(Long.MIN_VALUE);
-		assert (values.size() > 0) : "log data not found";
-		values = rds.getValues(Long.MIN_VALUE,5);
-		assert (values.size() > 0) : "log data not found";
-		values = rds.getValues(Long.MIN_VALUE, Long.MAX_VALUE);
-		assert (values.size() > 0) : "log data not found";
-		values = rds.getValues(-1, Long.MAX_VALUE);
-		assert (values.size() > 0) : "log data not found";
+		final List<SampledValue> allValues = rds.getValues(Long.MIN_VALUE);
+		List<SampledValue> testValues = rds.getValues(Long.MIN_VALUE);
+		assert (testValues.size() == rds.size()) : "log data not found";
+		
+		testValues = rds.getValues(Long.MIN_VALUE,5);
+		Assert.assertEquals(allValues.subList(0, 1), testValues);
+		
+		testValues = rds.getValues(Long.MIN_VALUE,1000);
+		Assert.assertEquals(allValues.subList(0, 1), testValues);
+
+		testValues = rds.getValues(Long.MIN_VALUE, Long.MAX_VALUE);
+		Assert.assertEquals(allValues, testValues);
+
+		testValues = rds.getValues(-1, Long.MAX_VALUE);
+		Assert.assertEquals(allValues, testValues);
+		
+		testValues = rds.getValues(999, 3001);
+		Assert.assertEquals(allValues.subList(1, 4), testValues);
+		
+		testValues = rds.getValues(1000, 3001);
+		Assert.assertEquals(allValues.subList(1, 4), testValues);
+		
+		testValues = rds.getValues(999, 3000);
+		Assert.assertEquals(allValues.subList(1, 3), testValues);
+
+		testValues = rds.getValues(999, Long.MAX_VALUE);
+		Assert.assertEquals(allValues.subList(1, allValues.size()), testValues);
+		
 		SampledValue sv = rds.getNextValue(Long.MIN_VALUE);
 		assert (sv != null) : "log data not found";
 		sv = rds.getPreviousValue(Long.MAX_VALUE);

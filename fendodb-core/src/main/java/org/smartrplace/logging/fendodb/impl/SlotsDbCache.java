@@ -21,23 +21,40 @@ import org.ogema.core.channelmanager.measurements.SampledValue;
 
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
+import org.slf4j.LoggerFactory;
 
 class SlotsDbCache implements FendoCache {
 
 	/*
 	 *Map< encoded recorded data id + "/" + filename -> values>
 	 */
-	private final Cache<String, List<SampledValue>> valueCache = CacheBuilder.newBuilder().softValues().build();
+	private final long MAX_WEIGHT = Long.getLong("org.ogema.recordeddata.slotsdb.entries_cache_size", 1_000_000);
+	private final boolean LOGGING = Boolean.getBoolean("org.ogema.recordeddata.slotsdb.entries_cache_logs");
+	
+	private final Cache<String, List<SampledValue>> valueCache;
+	
+	SlotsDbCache() {
+		CacheBuilder<String, List<SampledValue>> cb = CacheBuilder.newBuilder()
+				.maximumWeight(MAX_WEIGHT)
+				.weigher((String k, List<SampledValue> v) -> v.size());
+		if (LOGGING) {
+			cb.recordStats();
+		}
+		valueCache = cb.build();
+	}
 
-	private final void cache(final String accessToken, final List<SampledValue> values) {
+	private void cache(final String accessToken, final List<SampledValue> values) {
 		valueCache.put(accessToken, values);
 	}
 
-	private final void invalidate(final String accessToken) {
+	private void invalidate(final String accessToken) {
 		valueCache.invalidate(accessToken);
 	}
 
-	private final List<SampledValue> getCache(final String accessToken) {
+	private List<SampledValue> getCache(final String accessToken) {
+		if (LOGGING && (valueCache.stats().requestCount() % 100 == 0)) {
+			LoggerFactory.getLogger(getClass()).debug("cache stats: {} ({})", valueCache.stats(), valueCache.stats().hitRate());
+		}
 		return valueCache.getIfPresent(accessToken);
 	}
 
@@ -55,7 +72,7 @@ class SlotsDbCache implements FendoCache {
 	 * One instance per FileObject
 	 */
 	final class RecordedDataCache implements FendoInstanceCache {
-
+		
 		private final String key;
 
 		private RecordedDataCache(String recordedDataId, String file) {

@@ -142,8 +142,6 @@ public class FlexibleIntervalFileObject extends FileObject {
 
 	@Override
 	protected List<SampledValue> readInternal(long start, long end) throws IOException {
-
-//		List<SampledValue> toReturn = new Vector<SampledValue>();
 		final List<SampledValue> toReturn = new ArrayList<>(getDataSetCount());
 		if (!canRead) {
 			enableInput();
@@ -161,14 +159,16 @@ public class FlexibleIntervalFileObject extends FileObject {
 
 		for (int i = 0; i < getDataSetCountInternal(); i++) {
 			long timestamp = bb.getLong();
-			double d = bb.getDouble();
-			Quality s = Quality.getQuality(bb.get());
-			if (!Double.isNaN(d)) {
-				if (timestamp >= start && timestamp <= end) {
+			if (timestamp >= start && timestamp <= end) {
+				double d = bb.getDouble();
+				Quality s = Quality.getQuality(bb.get());
+				if (!Double.isNaN(d)) {
 					toReturn.add(new SampledValue(DoubleValues.of(d), timestamp, s));
 				}
-
+			} else {
+				bb.position(bb.position() + 9);
 			}
+
 		}
 
 		// TODO iterate through file and extract the required values.
@@ -281,30 +281,36 @@ public class FlexibleIntervalFileObject extends FileObject {
 			enableInput();
 		}
 		synchronized (this) {
-			SeekableByteChannel in = channel.position(HEADERSIZE);
-			ByteBuffer dsbuf = ByteBuffer.allocate(17);
-			final int countOfDataSets = getDataSetCountInternal();
-			long tcand = Long.MIN_VALUE;
-			double dcand = Double.NaN;
-			Quality qcand = null;
-			for (int i = 0; i < countOfDataSets; i++) {
-				int read = in.read(dsbuf);
-				//assert read == 16;
-				long timestamp2 = dsbuf.getLong();
-				double d = dsbuf.getDouble();
-				Quality s = Quality.getQuality(dsbuf.get());
-				dsbuf.rewind();
-				if (!Double.isNaN(d) && timestamp >= timestamp2) {
-					tcand = timestamp2;
-					dcand = d;
-					qcand = s;
-	//				candidate = new SampledValue(DoubleValues.of(d), timestamp2, s);
+			try {
+				SeekableByteChannel in = channel.position(HEADERSIZE);
+				ByteBuffer dsbuf = ByteBuffer.allocate(17);
+				final int countOfDataSets = getDataSetCountInternal();
+				long tcand = Long.MIN_VALUE;
+				double dcand = Double.NaN;
+				Quality qcand = null;
+				for (int i = 0; i < countOfDataSets; i++) {
+					int read = in.read(dsbuf);
+					dsbuf.rewind();
+					//assert read == 16;
+					long timestamp2 = dsbuf.getLong();
+					double d = dsbuf.getDouble();
+					Quality s = Quality.getQuality(dsbuf.get());
+					if (!Double.isNaN(d) && timestamp >= timestamp2) {
+						tcand = timestamp2;
+						dcand = d;
+						qcand = s;
+						//				candidate = new SampledValue(DoubleValues.of(d), timestamp2, s);
+					} else if (timestamp < timestamp2) {
+						break;
+					}
+					dsbuf.rewind();
 				}
-				else if (timestamp < timestamp2)
-					break;
+				if (!Double.isNaN(dcand)) {
+					return new SampledValue(DoubleValues.of(dcand), tcand, qcand);
+				}
+			} catch (RuntimeException re) {
+				throw new IOException("bug or corrupted file " + dataFile, re);
 			}
-			if (!Double.isNaN(dcand))
-				return new SampledValue(DoubleValues.of(dcand), tcand, qcand);
 		}
 		return null;
 	}

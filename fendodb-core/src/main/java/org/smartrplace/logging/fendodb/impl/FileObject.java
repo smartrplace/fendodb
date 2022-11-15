@@ -27,9 +27,10 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
-import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
+import org.ogema.core.channelmanager.measurements.Quality;
 
 import org.ogema.core.channelmanager.measurements.SampledValue;
 import org.slf4j.Logger;
@@ -209,6 +210,10 @@ public abstract class FileObject {
 		cache.cache(Collections.unmodifiableList(values));
 		return values;
 	}
+	
+	final Comparator<SampledValue> SampledValuesTimeComparator = (sv1, sv2) -> {
+		return Long.compare(sv1.getTimestamp(), sv2.getTimestamp());
+	};
 
 	public List<SampledValue> read(long start, long end) throws IOException {
 		if (start <= startTimeStamp && end >= getTimestampForLatestValue()) {
@@ -216,18 +221,19 @@ public abstract class FileObject {
 		}
 		final List<SampledValue> values = cache.getCache();
 		if (values != null) {
-			final List<SampledValue> copy = new ArrayList<>(values.size());
-			for (final SampledValue sv : values) {
-				final long t = sv.getTimestamp();
-				if (t < start) {
-					continue;
-				}
-				if (t > end) {
-					break;
-				}
-				copy.add(sv);
+			SampledValue svStart = new SampledValue(null, start, Quality.BAD);
+			SampledValue svEnd = new SampledValue(null, end, Quality.BAD);
+			int insStart = Collections.binarySearch(values, svStart, SampledValuesTimeComparator);
+			int insEnd = Collections.binarySearch(values, svEnd, SampledValuesTimeComparator);
+			if (insStart < 0) {
+				insStart = -(insStart + 1);
 			}
-			return copy;
+			if (insEnd < 0) {
+				insEnd = -(insEnd + 1);
+			} else {
+				insEnd++;
+			}
+			return values.subList(insStart, insEnd);
 		}
 		return readInternal(start, end);
 	}
