@@ -28,7 +28,7 @@ class SlotsDbCache implements FendoCache {
 	/*
 	 *Map< encoded recorded data id + "/" + filename -> values>
 	 */
-	private final long MAX_WEIGHT = Long.getLong("org.ogema.recordeddata.slotsdb.entries_cache_size", 1_000_000);
+	private final long MAX_WEIGHT = Long.getLong("org.ogema.recordeddata.slotsdb.entries_cache_size", 100_000);
 	private final boolean LOGGING = Boolean.getBoolean("org.ogema.recordeddata.slotsdb.entries_cache_logs");
 	
 	private final Cache<String, List<SampledValue>> valueCache;
