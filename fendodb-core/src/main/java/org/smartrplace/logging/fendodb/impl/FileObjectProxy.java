@@ -1069,7 +1069,8 @@ public final class FileObjectProxy {
 	}
 	
 	Path isZipped(String day, String label) throws IOException {
-		Path zipFile = Path.of(rootNodeString, day + ".zip");
+		Path zipFile = //Path.of(rootNodeString, day + ".zip");
+				FileSystems.getDefault().getPath(rootNodeString, day + ".zip");
 		if (!Files.exists(zipFile)) {
 			return null;
 		}

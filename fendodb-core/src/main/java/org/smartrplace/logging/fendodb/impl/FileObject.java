@@ -21,6 +21,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.UnsupportedEncodingException;
 import java.net.URLDecoder;
+import java.nio.Buffer;
 import java.nio.ByteBuffer;
 import java.nio.channels.SeekableByteChannel;
 import java.nio.file.Files;
@@ -193,7 +194,7 @@ public abstract class FileObject {
 			ByteBuffer header = ByteBuffer.allocate(16);
 			header.putLong(this.startTimeStamp);
 			header.putLong(stepIntervall);
-			header.rewind();
+			((Buffer) header).rewind();
 			channel.write(header);
 			length += 16;
 			/* wrote 2*8 Bytes */
@@ -205,7 +206,9 @@ public abstract class FileObject {
 		if (values != null) {
 			return values;
 		}
-		values = readFullyInternal();
+		synchronized (this) {
+			values = readFullyInternal();
+		}
 		// store until next write access
 		cache.cache(Collections.unmodifiableList(values));
 		return values;

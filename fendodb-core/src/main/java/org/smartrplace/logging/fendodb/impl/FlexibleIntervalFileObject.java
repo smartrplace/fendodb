@@ -91,7 +91,7 @@ public class FlexibleIntervalFileObject extends FileObject {
 			buf.putLong(timestamp);
 			buf.putDouble(value);
 			buf.put(flag);
-			buf.rewind();
+			((Buffer) buf).rewind();
 			//channel.write(buf);
 			synchronized(this) {
 				channel.position(length).write(buf);
@@ -128,7 +128,7 @@ public class FlexibleIntervalFileObject extends FileObject {
 					channel.position((dataSetCount - 1) * DATASETSIZE + HEADERSIZE);					
 					channel.read(bb);
 				}
-				bb.flip();
+				((Buffer) bb).flip();
 				long l = bb.getLong();
 				return l;
 			} catch (IOException | NullPointerException e) {
@@ -290,7 +290,7 @@ public class FlexibleIntervalFileObject extends FileObject {
 				Quality qcand = null;
 				for (int i = 0; i < countOfDataSets; i++) {
 					int read = in.read(dsbuf);
-					dsbuf.rewind();
+					((Buffer) dsbuf).rewind();
 					//assert read == 16;
 					long timestamp2 = dsbuf.getLong();
 					double d = dsbuf.getDouble();
@@ -303,7 +303,7 @@ public class FlexibleIntervalFileObject extends FileObject {
 					} else if (timestamp < timestamp2) {
 						break;
 					}
-					dsbuf.rewind();
+					((Buffer) dsbuf).rewind();
 				}
 				if (!Double.isNaN(dcand)) {
 					return new SampledValue(DoubleValues.of(dcand), tcand, qcand);

@@ -16,6 +16,7 @@
 package org.smartrplace.logging.fendodb.impl;
 
 import java.io.IOException;
+import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -83,7 +84,8 @@ public final class FileObjectList {
 	}
 	
 	private Path getBasePath() {
-		return basePath != null ? basePath : Path.of(foldername);
+		return basePath != null ? basePath : //Path.of(foldername);
+				FileSystems.getDefault().getPath(foldername);
 	}
 
 	/**

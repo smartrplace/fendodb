@@ -72,7 +72,7 @@ public class ConstantIntervalFileObject extends FileObject {
 			}
 			buf.putDouble(value);
 			buf.put(flag);
-			buf.rewind();
+			((Buffer) buf).rewind();
 			synchronized (this) {
 				channel.write(buf);
 			}
@@ -105,14 +105,14 @@ public class ConstantIntervalFileObject extends FileObject {
 						// welcher Wert
 						// undefined sein
 						// soll 00 ok?
-						buf.rewind();
+						((Buffer) buf).rewind();
 						channel.write(buf);
 						buf.clear();
 						length += 9;
 					}
 					buf.putDouble(value);
 					buf.put(flag);
-					buf.rewind();
+					((Buffer) buf).rewind();
 					channel.write(buf);
 					length += 9;
 				}
@@ -185,7 +185,7 @@ public class ConstantIntervalFileObject extends FileObject {
 					channel.position(getBytePosition(timestamp));
 					ByteBuffer data = ByteBuffer.allocate(9);
 					channel.read(data);
-					data.rewind();
+					((Buffer) data).rewind();
 					Double toReturn = data.getDouble();
 					if (!Double.isNaN(toReturn)) {
 						return new SampledValue(DoubleValues.of(toReturn), timestamp, Quality.getQuality(data.get()));
@@ -306,7 +306,7 @@ public class ConstantIntervalFileObject extends FileObject {
 					channel.position(getBytePosition(timestamp));
 					channel.read(data);
 				}
-				data.rewind();
+				((Buffer) data).rewind();
 				Double toReturn = data.getDouble();
 				if (!Double.isNaN(toReturn)) {
 					return new SampledValue(DoubleValues.of(toReturn), timestamp, Quality.getQuality(data.get()));
