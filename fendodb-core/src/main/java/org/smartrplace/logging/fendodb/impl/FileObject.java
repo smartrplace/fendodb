@@ -150,9 +150,6 @@ public abstract class FileObject {
 	 * Requires the SlotsDbStorage read lock to be held.
 	 */
 	protected final void enableInput() throws IOException {
-		if (canRead) {
-			return;
-		}
 		synchronized(this) {
 			if (canRead) {
 				return;

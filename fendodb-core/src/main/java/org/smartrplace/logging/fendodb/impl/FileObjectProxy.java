@@ -1079,9 +1079,18 @@ public final class FileObjectProxy {
 		}
 		FileSystem zipfs = zipFiles.get(zipFile);
 		if (zipfs == null) {
-			zipfs = FileSystems.newFileSystem(zipFile, getClass().getClassLoader());
+			//zipfs = FileSystems.newFileSystem(zipFile, getClass().getClassLoader());
 			// keep open zip files in map, zip path from closed zip fs will not work
-			zipFiles.put(zipFile, zipfs);
+			//zipFiles.put(zipFile, zipfs);
+			
+			// keep open zip files in map, zip path from closed zip fs will not work
+			zipfs = zipFiles.computeIfAbsent(zipFile, zip -> {
+								try {
+									return FileSystems.newFileSystem(zip, FileObjectProxy.class.getClassLoader());
+								} catch (IOException ex) {
+									return null;
+								}
+							});
 		}
 		Path dataseriesZipPath = zipfs.getPath(day, label);
 		if (Files.exists(dataseriesZipPath)) {
