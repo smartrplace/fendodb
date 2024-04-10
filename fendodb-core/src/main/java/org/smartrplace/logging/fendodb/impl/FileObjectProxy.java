@@ -161,6 +161,7 @@ public final class FileObjectProxy {
 			deleteJob = null;
 			limit_folders = 0;
 		}
+		logger.info("Folder period: {}.", unit);
 		final int maxDbSize = config.getMaxDatabaseSize();
 		if (maxDbSize > 0) {
 			if (maxDbSize < FendoDbConfiguration.MINIMUM_DATABASE_SIZE) 
