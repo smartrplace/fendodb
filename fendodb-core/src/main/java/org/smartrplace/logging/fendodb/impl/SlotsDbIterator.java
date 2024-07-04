@@ -83,7 +83,9 @@ class SlotsDbIterator implements Iterator<SampledValue> {
 					return hasNext();
 				}
 			}
-			return nextIsNewer(current, next) && !(next.getTimestamp() > end);
+			if (nextIsNewer(current, next)) {
+				return next.getTimestamp() <= end;
+			}
 		}
 		parseNextFile();
 		if (folderValues == null) {
