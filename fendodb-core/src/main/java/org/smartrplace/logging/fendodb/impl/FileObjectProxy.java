@@ -592,6 +592,20 @@ public final class FileObjectProxy {
 //		}
 //		return encodedLabel;
 //	}
+	
+	protected SampledValue readNextInFolder(FileObjectList fol, long ts) throws IOException {
+		SampledValue rval = null;
+		//System.out.printf("readNextInFolder(%d): %s%n", ts, fol);
+		for (FileObject fo: fol.getFileObjectsFromTo(ts, Long.MAX_VALUE)) {
+			if (rval == null || rval.getTimestamp() >= fo.startTimeStamp) {
+				SampledValue sv = fo.readNextValue(Math.max(ts, fo.startTimeStamp));
+				if (sv != null && (rval == null || rval.getTimestamp() > sv.getTimestamp())) {
+					rval = sv;
+				}
+			}
+		}
+		return rval;
+	}
 
 	//Note: Comprehensive revision to fix the method. The previous version could just find data from the
 	//current day
@@ -607,6 +621,12 @@ public final class FileObjectProxy {
 				//System.out.printf("%s readNextValue(%s, %d) = null [0](no folder)%n", Thread.currentThread().getName(), label, t);
 				return null;
 			}
+
+			do {
+				result = readNextInFolder(folder, t);
+			} while (result == null && (folder = getNextFolder(label, folder, false)) != null);
+
+/*			
 			List<FileObject> folList = folder.getFileObjectsStartingAt(timestamp);
 			while (folList.isEmpty()) {
 				//check next day // XXX should probably not happen
@@ -639,6 +659,7 @@ public final class FileObjectProxy {
 					result = toReadFrom.readNextValue(timestamp); // null if no value for timestamp is available
 				}
 			}
+*/			
 		} finally {
 			folderLock.readLock().unlock();
 		}

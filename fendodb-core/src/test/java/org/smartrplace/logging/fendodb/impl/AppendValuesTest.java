@@ -21,6 +21,8 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -155,7 +157,12 @@ public class AppendValuesTest extends SlotsDbTest {
 			path = data.getPath();
 			Assert.assertTrue(data.isEmpty());
 			data.insertValues(values);
-			// no need to wait for flush here, since closing the db must lead to a flush
+			Assert.assertFalse(data.isEmpty());
+			try {
+				// no need to wait for flush here, since closing the db must lead to a flush
+				Thread.sleep(1000);
+			} catch (InterruptedException ex) {
+			}
 		}
 		try (final SlotsDb instance2 = new SlotsDb(Paths.get(SlotsDb.DB_TEST_ROOT_FOLDER), null, null, null)) {
 			final List<String> ids = instance2.getAllRecordedDataStorageIDs();

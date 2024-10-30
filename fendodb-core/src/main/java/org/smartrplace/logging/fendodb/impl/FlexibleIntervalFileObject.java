@@ -250,8 +250,9 @@ public class FlexibleIntervalFileObject extends FileObject {
 		ByteBuffer bb = ByteBuffer.allocate((int) (length - HEADERSIZE));
 		final int countOfDataSets = getDataSetCountInternal();
 
+		int read;
 		synchronized (this) {
-			channel.position(startpos).read(bb);
+			read = channel.position(startpos).read(bb);
 		}
 		// casting is a hack to avoid incompatibility when building this on Java 9 and run on Java 8
 		// ByteBuffer#rewind used to return a Buffer in Jdk8, but from Java 9 on returns a ByteBuffer
@@ -261,14 +262,14 @@ public class FlexibleIntervalFileObject extends FileObject {
 			long nextTimeStamp = bb.getLong();
 			double d = bb.getDouble();
 			Quality s = Quality.getQuality(bb.get());
+			//System.out.printf("%s readNextValue(%d): %tc = %f, file=%s, file data size=%d, countOfDataSets=%d, data read=%d%n",
+			//			Thread.currentThread().getName(), timestamp, nextTimeStamp, d, dataFile, length-HEADERSIZE, countOfDataSets, read);
 			if (!Double.isNaN(d) && timestamp <= nextTimeStamp) {
-				//System.out.printf("%s readNextValue(%d) = %f, file data size=%d, countOfDataSets=%d, data read=%d%n",
-						//Thread.currentThread().getName(), timestamp, d, length-HEADERSIZE, countOfDataSets, read);
 				return new SampledValue(DoubleValues.of(d), nextTimeStamp, s);
 			}
 		}
-		//System.out.printf("%s readNextValue(%d) = null, file data size=%d, countOfDataSets=%d, data read=%d%n",
-				//Thread.currentThread().getName(), timestamp, length-HEADERSIZE, countOfDataSets, read);
+		//System.out.printf("%s readNextValue(%d): null, file=%s, file data size=%d, countOfDataSets=%d, data read=%d%n",
+		//				Thread.currentThread().getName(), timestamp, dataFile, length-HEADERSIZE, countOfDataSets, read);
 		return null;
 	}
 

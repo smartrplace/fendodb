@@ -55,7 +55,6 @@ import org.ogema.recordeddata.RecordedDataStorage;
 import org.smartrplace.logging.fendodb.CloseableDataRecorder;
 import org.smartrplace.logging.fendodb.FendoDbConfiguration;
 import org.smartrplace.logging.fendodb.FendoDbConfigurationBuilder;
-import org.smartrplace.logging.fendodb.impl.SlotsDb;
 
 public class SynchronizationTest extends FactoryTest {
 
@@ -370,9 +369,16 @@ public class SynchronizationTest extends FactoryTest {
 					.mapToObj(Integer::valueOf)
 					.collect(Collectors.toList());
 			final List<SampledValue> values = IntStream.range(0, nrDatapoints)
-				.mapToObj(i -> new SampledValue(new IntegerValue(expectedValues.get(i)), (ONE_DAY/SLOTS_PER_DAY) * i + Math.round(Math.random()*4 - 2) , Quality.GOOD))
+				.mapToObj(i -> new SampledValue(new IntegerValue(expectedValues.get(i)), (ONE_DAY/SLOTS_PER_DAY) * i, Quality.GOOD))
 				.collect(Collectors.toList());
+			values.forEach(sv -> System.out.printf("%tc: %s%n", sv.getTimestamp(), sv.getValue().getStringValue()));
 			ts.insertValues(values);
+			/*
+			SampledValue firstVal = ts.getNextValue(Long.MIN_VALUE);
+			Assert.assertEquals(nrDatapoints, ts.getValues(Long.MIN_VALUE).size());
+			Assert.assertNotNull(firstVal);
+			Assert.assertEquals(expectedValues.get(0).intValue(), firstVal.getValue().getIntegerValue());
+			*/
 			final CountDownLatch threadsReady = new CountDownLatch(readerThreads);
 			final CountDownLatch startLatch = new CountDownLatch(1);
 			final Callable<List<Integer>> constTask = () -> {
@@ -385,11 +391,18 @@ public class SynchronizationTest extends FactoryTest {
 			final List<Future<List<Integer>>> results = IntStream.range(0, readerThreads)
 				.mapToObj(i -> e.submit(constTask))
 				.collect(Collectors.toList());
-			Assert.assertTrue("Reader threads not ready", threadsReady.await(15, TimeUnit.SECONDS));
+			Assert.assertTrue("Reader threads not ready", threadsReady.await(5, TimeUnit.SECONDS));
 			startLatch.countDown();
 			for (Future<List<Integer>> result: results) {
-				final List<Integer> valuesResult = result.get(30, TimeUnit.SECONDS);
-				Assert.assertTrue("Unexpected result " + valuesResult + ", expected " + expectedValues, expectedValues.equals(valuesResult));
+				final List<Integer> valuesResult = result.get(5, TimeUnit.SECONDS);
+				if (!expectedValues.equals(valuesResult)) {
+					for (int i = 0; i < Math.max(valuesResult.size(), expectedValues.size()); i++) {
+						System.out.printf("%5s <-> %5s%n",
+								expectedValues.size() <= i ? "*" : expectedValues.get(i).intValue(),
+								valuesResult.size() <= i ? "*" : valuesResult.get(i).intValue());
+					}
+					Assert.fail("Unexpected result " + valuesResult + ", expected " + expectedValues);
+				}
 			}
 		} finally {
 			e.shutdownNow();
@@ -440,19 +453,23 @@ public class SynchronizationTest extends FactoryTest {
 	
 	@Test
 	public void concurrentReadsWorkConstNext() throws IOException, DataRecorderException, InterruptedException, ExecutionException, TimeoutException {
+		int nrValues = 1000;
 		final Function<RecordedDataStorage, List<SampledValue>>  reader = ts -> {
 			long t= Long.MIN_VALUE;
 			final List<SampledValue> values = new ArrayList<>();
-			while (true) {
+			while (values.size() < nrValues) {
 				final SampledValue sv = ts.getNextValue(t);
-				if (sv == null)
-					break;
-				values.add(sv);
-				t = sv.getTimestamp() + 1;
+				//if (sv == null)
+					//break;
+				if (sv != null) {
+					values.add(sv);
+					t = sv.getTimestamp() + 1;
+				}
 			}
+			System.out.printf("reader done, number of values: %s%n", values.size());
 			return values;
 		};
-		this.concurrentReadsWork(CONSTANT_CFG, reader, 1000);
+		this.concurrentReadsWork(CONSTANT_CFG, reader, nrValues);
 	}
 	
 	

@@ -20,7 +20,6 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.Buffer;
 import java.nio.ByteBuffer;
-import java.nio.channels.SeekableByteChannel;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -266,7 +265,11 @@ public class ConstantIntervalFileObject extends FileObject {
 	@Override
 	public SampledValue readNextValue(long timestamp) throws IOException {
 		// Calculate next Value, round Timestamp to next Value
-		timestamp = timestamp + (storagePeriod - ((timestamp - startTimeStamp) % storagePeriod));
+		long searchTs = (timestamp - startTimeStamp) % storagePeriod != 0
+				? (((timestamp - startTimeStamp) / storagePeriod) + 1 ) * storagePeriod + startTimeStamp
+				: ((timestamp - startTimeStamp) / storagePeriod) * storagePeriod + startTimeStamp;
+		//System.out.printf("readNextValue(%s, %d): start timestamp = %d, storage period = %d, search timestamp = %d%n", dataFile, timestamp, startTimeStamp, storagePeriod, searchTs);
+		timestamp = searchTs;
 		long startPos = getBytePosition(timestamp);
 		long endPos = getBytePosition(getTimestampForLatestValueInternal());
 		for (int i = 0; i <= (endPos - startPos) / 9; i++) {
@@ -276,7 +279,7 @@ public class ConstantIntervalFileObject extends FileObject {
 				}
 				ByteBuffer data = ByteBuffer.allocate(9);
 				synchronized (this) {
-					channel.position(getBytePosition(timestamp));					
+					channel.position(getBytePosition(timestamp));
 					channel.read(data);
 				}
 				data.flip();
