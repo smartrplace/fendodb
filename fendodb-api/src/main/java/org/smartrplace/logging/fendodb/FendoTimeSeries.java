@@ -80,8 +80,4 @@ public interface FendoTimeSeries extends RecordedDataStorage {
 		final Iterable<SampledValue> iterable = () -> iterator(start, end);
 		return StreamSupport.stream(iterable.spliterator(), false);
 	};
-
-	default boolean isReadOnly() {
-		return true;
-	}
 }
