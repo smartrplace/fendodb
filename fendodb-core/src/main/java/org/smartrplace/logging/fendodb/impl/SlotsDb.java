@@ -22,6 +22,7 @@ import java.io.UnsupportedEncodingException;
 import java.net.URLDecoder;
 import java.nio.channels.FileLock;
 import java.nio.channels.OverlappingFileLockException;
+import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
@@ -132,7 +133,13 @@ public class SlotsDb implements CloseableDataRecorder {
 			throw new IllegalArgumentException("Path " + dbBaseFolder + " exists and is not a directory.");
 		if (hardConfigReset && configuration == null)
 			throw new IllegalArgumentException("Config reset without configuration?");
-		Files.createDirectories(dbBaseFolder);
+		if (!Files.exists(dbBaseFolder)) {
+			//throws FileAlreadyExistsException if dbBaseFolder is a symbolic link
+			Files.createDirectories(dbBaseFolder);
+		}
+		if (!Files.isDirectory(dbBaseFolder)) {
+			throw new IOException(dbBaseFolder + " exists, but is not a directory");
+		}
 		this.isOgemaHistoryDb = factory != null && dbBaseFolder.equals(factory.ogemaHistoryDb);
 		this.slotsDbStoragePath = dbBaseFolder.resolve(STORAGE_PERSISTENCE_FILE);
 		this.persistentConfig = dbBaseFolder.resolve(CONFIG_PERSISTENCE_FILE);
@@ -451,7 +458,7 @@ public class SlotsDb implements CloseableDataRecorder {
 					final Iterator<SampledValue> iterator = timeseries.iterator(start, end);
 					while (iterator.hasNext()) {
 						buffer.add(iterator.next());
-						if (buffer.size() >= 1000) {
+						if (buffer.size() >= 100000) {
 							storage.insertValues(buffer);
 							buffer.clear();
 						}

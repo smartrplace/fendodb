@@ -86,26 +86,25 @@ public class FlexibleIntervalFileObject extends FileObject {
 		if (!canWrite) {
 			enableOutput();
 		}
-		if (timestamp > lastTimestamp) {
-			ByteBuffer buf = ByteBuffer.allocate(17);
-			buf.putLong(timestamp);
-			buf.putDouble(value);
-			buf.put(flag);
-			((Buffer) buf).rewind();
-			//channel.write(buf);
-			synchronized(this) {
+		synchronized(this) {
+			if (timestamp > lastTimestamp) {
+				ByteBuffer buf = ByteBuffer.allocate(17);
+				buf.putLong(timestamp);
+				buf.putDouble(value);
+				buf.put(flag);
+				((Buffer) buf).rewind();
+				//channel.write(buf);
 				channel.position(length).write(buf);
-			}
-			lastTimestamp = timestamp;
-			length += 17;
-			
-            if (FLUSH_ON_APPEND) {
-				if (channel instanceof FileChannel) {
-					((FileChannel)channel).force(false);
-				}
-            }
-		}
+				lastTimestamp = timestamp;
+				length += 17;
 
+				if (FLUSH_ON_APPEND) {
+					if (channel instanceof FileChannel) {
+						((FileChannel) channel).force(false);
+					}
+				}
+			}
+		}
 	}
 
 	@Override
@@ -177,7 +176,7 @@ public class FlexibleIntervalFileObject extends FileObject {
 
 	@Override
 	protected List<SampledValue> readFullyInternal() throws IOException {
-//		List<SampledValue> toReturn = new Vector<SampledValue>();
+		//!!! must be called inside synchronized block!
 		final List<SampledValue> toReturn = new ArrayList<>(getDataSetCountInternal());
 		if (!canRead) {
 			enableInput();
@@ -185,9 +184,7 @@ public class FlexibleIntervalFileObject extends FileObject {
 		long startpos = HEADERSIZE;
 		final byte[] b = new byte[(int) (length - HEADERSIZE)];
 		ByteBuffer bb = ByteBuffer.wrap(b);
-		synchronized (this) {
-			channel.position(startpos).read(bb);
-		}
+		channel.position(startpos).read(bb);
 		// casting is a hack to avoid incompatibility when building this on Java 9 and run on Java 8
 		// ByteBuffer#rewind used to return a Buffer in Jdk8, but from Java 9 on returns a ByteBuffer
 		((Buffer) bb).rewind();
@@ -253,8 +250,9 @@ public class FlexibleIntervalFileObject extends FileObject {
 		ByteBuffer bb = ByteBuffer.allocate((int) (length - HEADERSIZE));
 		final int countOfDataSets = getDataSetCountInternal();
 
+		int read;
 		synchronized (this) {
-			channel.position(startpos).read(bb);
+			read = channel.position(startpos).read(bb);
 		}
 		// casting is a hack to avoid incompatibility when building this on Java 9 and run on Java 8
 		// ByteBuffer#rewind used to return a Buffer in Jdk8, but from Java 9 on returns a ByteBuffer
@@ -264,14 +262,14 @@ public class FlexibleIntervalFileObject extends FileObject {
 			long nextTimeStamp = bb.getLong();
 			double d = bb.getDouble();
 			Quality s = Quality.getQuality(bb.get());
+			//System.out.printf("%s readNextValue(%d): %tc = %f, file=%s, file data size=%d, countOfDataSets=%d, data read=%d%n",
+			//			Thread.currentThread().getName(), timestamp, nextTimeStamp, d, dataFile, length-HEADERSIZE, countOfDataSets, read);
 			if (!Double.isNaN(d) && timestamp <= nextTimeStamp) {
-				//System.out.printf("%s readNextValue(%d) = %f, file data size=%d, countOfDataSets=%d, data read=%d%n",
-						//Thread.currentThread().getName(), timestamp, d, length-HEADERSIZE, countOfDataSets, read);
 				return new SampledValue(DoubleValues.of(d), nextTimeStamp, s);
 			}
 		}
-		//System.out.printf("%s readNextValue(%d) = null, file data size=%d, countOfDataSets=%d, data read=%d%n",
-				//Thread.currentThread().getName(), timestamp, length-HEADERSIZE, countOfDataSets, read);
+		//System.out.printf("%s readNextValue(%d): null, file=%s, file data size=%d, countOfDataSets=%d, data read=%d%n",
+		//				Thread.currentThread().getName(), timestamp, dataFile, length-HEADERSIZE, countOfDataSets, read);
 		return null;
 	}
 

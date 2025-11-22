@@ -57,6 +57,7 @@ public class DeletionTest extends FactoryTest {
 			cfg.setStorageType(StorageType.ON_VALUE_UPDATE);
 			final FendoTimeSeries ts = rec.createRecordedDataStorage("test", cfg);
 			ts.insertValues(testValues);
+			Assert.assertEquals(testValues.size(), ts.getValues(Long.MIN_VALUE).size());
 			Assert.assertFalse(ts.isEmpty(Long.MIN_VALUE, 4 * ONE_DAY));
 			Assert.assertTrue("Data deletion failed",rec.deleteDataBefore(Instant.ofEpochMilli(4 * ONE_DAY)));
 			Assert.assertTrue("Data found although it has been deleted",ts.isEmpty(Long.MIN_VALUE, 4 * ONE_DAY));

@@ -297,4 +297,15 @@ public class IteratorTest extends DbTest {
 			Assert.assertFalse("Iterator#hasNext should return false", it.hasNext());
 		sdb.deleteRecordedDataStorage(rds.getPath());
 	}
+	
+	@Test
+	public void emptyIntervalHasEmptyIterator() throws DataRecorderException {
+		RecordedDataStorage rds = sdb.createRecordedDataStorage("emptyIntervalHasEmptyIterator", config);
+		rds.insertValue(new SampledValue(new FloatValue(1), 100000, Quality.GOOD));
+		rds.insertValue(new SampledValue(new FloatValue(2), 200000, Quality.GOOD));
+		rds.insertValue(new SampledValue(new FloatValue(3), 300000, Quality.GOOD));
+		rds.insertValue(new SampledValue(new FloatValue(4), 400000, Quality.GOOD));
+		Assert.assertFalse(rds.iterator(210_000, 290_000).hasNext());
+	}
+	
 }

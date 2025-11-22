@@ -21,6 +21,7 @@ import java.nio.file.Paths;
 import java.security.AccessController;
 import java.security.PrivilegedAction;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.Optional;
 
 import org.ogema.core.administration.FrameworkClock;
@@ -68,20 +69,27 @@ public class CoreSlotsRegistration implements FendoDbFactory.SlotsDbListener, Cl
 		final long scanningItv = getLongValue(ctx, "org.ogema.recordeddata.slotsdb.scanning_interval", 24 * 60 * 60 * 1000, 5 * 60 * 1000);
 		
 		final boolean compatMode = compatMode0 != null ? Boolean.parseBoolean(compatMode0) : false;
-		final FendoDbConfiguration config = FendoDbConfigurationBuilder.getInstance()
+		FendoDbConfigurationBuilder configBuilder = FendoDbConfigurationBuilder.getInstance()
 				.setUseCompatibilityMode(compatMode)
 				.setMaxOpenFolders(maxOpenFolders)
 				.setFlushPeriod(flushperiodMs)
 				.setDataLifetimeInDays(limitDays)
 				.setMaxDatabaseSize(limitSizeMb)
 				.setDataExpirationCheckInterval(scanningItv)
-				.setReloadDaysInterval(0)
-				.build();
-		final CloseableDataRecorder slots = slotsFactory.getInstance(Paths.get(folder), config);
-		this.sreg = ctx.registerService(DataRecorder.class, slots, null);
-		this.slots = slots;
+				.setReloadDaysInterval(0);
+
+		String timeUnitName = ctx.getProperty("org.ogema.recordeddata.slotsdb.timeperiod");
+		if (timeUnitName != null) {
+			final ChronoUnit unit = ChronoUnit.valueOf(timeUnitName);
+			configBuilder.setTemporalUnit(unit);
+		}
+		
+		final FendoDbConfiguration config = configBuilder.build();
+		final CloseableDataRecorder slotsInstance = slotsFactory.getInstance(Paths.get(folder), config);
+		this.sreg = ctx.registerService(DataRecorder.class, slotsInstance, null);
+		this.slots = slotsInstance;
 		this.active = true;
-		this.dbFolder = slots.getPath();
+		this.dbFolder = slotsInstance.getPath();
 		slotsFactory.addDatabaseListener(this);
 		
 		clock.addClockChangeListener(this);
@@ -93,8 +101,8 @@ public class CoreSlotsRegistration implements FendoDbFactory.SlotsDbListener, Cl
 			clock.removeClockChangeListener(this);
 		} catch (Exception ignore) { /* you never know... */}
 		this.active = false;
-		final ServiceRegistration<DataRecorder> sreg = this.sreg;
-		final CloseableDataRecorder slots = this.slots;
+		final ServiceRegistration<DataRecorder> registration = this.sreg;
+		final CloseableDataRecorder slotsInstance = this.slots;
 		this.sreg = null;
 		this.slots = null;
 		this.active = false;
@@ -103,14 +111,14 @@ public class CoreSlotsRegistration implements FendoDbFactory.SlotsDbListener, Cl
 		try {
 			slotsFactory.removeDatabaseListener(this);
 		} catch (Exception ignore) {}
-		if (sreg != null) {
+		if (registration != null) {
 			try {
-				sreg.unregister();
+				registration.unregister();
 			} catch (Exception ignore) {}
 		}
-		if (slots != null) {
+		if (slotsInstance != null) {
 			try {
-				slots.close();
+				slotsInstance.close();
 			} catch (Exception ignore) {}
 		}
 	}
@@ -165,7 +173,7 @@ public class CoreSlotsRegistration implements FendoDbFactory.SlotsDbListener, Cl
 		}
 	}
 	
-	private final boolean deleteDataFrom(final long t0) {
+	private boolean deleteDataFrom(final long t0) {
 		return AccessController.doPrivileged(new PrivilegedAction<Boolean>() {
 
 			@Override
@@ -180,7 +188,7 @@ public class CoreSlotsRegistration implements FendoDbFactory.SlotsDbListener, Cl
 		});
 	}
 	
-	private final static int getIntValue(final BundleContext ctx, final String property, final int defaultVal, final int minValue) {
+	private static int getIntValue(final BundleContext ctx, final String property, final int defaultVal, final int minValue) {
 		final String val = ctx.getProperty(property);
 		if (val != null) {
 			try {
@@ -192,7 +200,7 @@ public class CoreSlotsRegistration implements FendoDbFactory.SlotsDbListener, Cl
 		return defaultVal;
 	}
 	
-	private final static long getLongValue(final BundleContext ctx, final String property, final long defaultVal, final long minValue) {
+	private static long getLongValue(final BundleContext ctx, final String property, final long defaultVal, final long minValue) {
 		final String val = ctx.getProperty(property);
 		if (val != null) {
 			try {

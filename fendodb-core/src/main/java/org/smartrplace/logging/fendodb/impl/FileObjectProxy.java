@@ -161,6 +161,7 @@ public final class FileObjectProxy {
 			deleteJob = null;
 			limit_folders = 0;
 		}
+		logger.info("Folder period: {}.", unit);
 		final int maxDbSize = config.getMaxDatabaseSize();
 		if (maxDbSize > 0) {
 			if (maxDbSize < FendoDbConfiguration.MINIMUM_DATABASE_SIZE) 
@@ -591,6 +592,20 @@ public final class FileObjectProxy {
 //		}
 //		return encodedLabel;
 //	}
+	
+	protected SampledValue readNextInFolder(FileObjectList fol, long ts) throws IOException {
+		SampledValue rval = null;
+		//System.out.printf("readNextInFolder(%d): %s%n", ts, fol);
+		for (FileObject fo: fol.getFileObjectsFromTo(ts, Long.MAX_VALUE)) {
+			if (rval == null || rval.getTimestamp() >= fo.startTimeStamp) {
+				SampledValue sv = fo.readNextValue(Math.max(ts, fo.startTimeStamp));
+				if (sv != null && (rval == null || rval.getTimestamp() > sv.getTimestamp())) {
+					rval = sv;
+				}
+			}
+		}
+		return rval;
+	}
 
 	//Note: Comprehensive revision to fix the method. The previous version could just find data from the
 	//current day
@@ -606,6 +621,12 @@ public final class FileObjectProxy {
 				//System.out.printf("%s readNextValue(%s, %d) = null [0](no folder)%n", Thread.currentThread().getName(), label, t);
 				return null;
 			}
+
+			do {
+				result = readNextInFolder(folder, t);
+			} while (result == null && (folder = getNextFolder(label, folder, false)) != null);
+
+/*			
 			List<FileObject> folList = folder.getFileObjectsStartingAt(timestamp);
 			while (folList.isEmpty()) {
 				//check next day // XXX should probably not happen
@@ -638,6 +659,7 @@ public final class FileObjectProxy {
 					result = toReadFrom.readNextValue(timestamp); // null if no value for timestamp is available
 				}
 			}
+*/			
 		} finally {
 			folderLock.readLock().unlock();
 		}
@@ -1079,9 +1101,18 @@ public final class FileObjectProxy {
 		}
 		FileSystem zipfs = zipFiles.get(zipFile);
 		if (zipfs == null) {
-			zipfs = FileSystems.newFileSystem(zipFile, getClass().getClassLoader());
+			//zipfs = FileSystems.newFileSystem(zipFile, getClass().getClassLoader());
 			// keep open zip files in map, zip path from closed zip fs will not work
-			zipFiles.put(zipFile, zipfs);
+			//zipFiles.put(zipFile, zipfs);
+			
+			// keep open zip files in map, zip path from closed zip fs will not work
+			zipfs = zipFiles.computeIfAbsent(zipFile, zip -> {
+								try {
+									return FileSystems.newFileSystem(zip, FileObjectProxy.class.getClassLoader());
+								} catch (IOException ex) {
+									return null;
+								}
+							});
 		}
 		Path dataseriesZipPath = zipfs.getPath(day, label);
 		if (Files.exists(dataseriesZipPath)) {

@@ -10,6 +10,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
+import java.time.Instant;
+import java.util.Optional;
 
 import org.slf4j.LoggerFactory;
 
@@ -79,6 +81,19 @@ public class FileUtils {
 		if (idx <= 0)
 			return filename + TEMP_FILE_SUFFIX;
 		return filename.substring(0, idx) + TEMP_FILE_SUFFIX + filename.substring(idx);
+	}
+	
+	static Optional<Instant> getZipFileTime(Path zip) {
+		String fname = zip.getFileName().toString();
+		if (!fname.endsWith(".zip")) {
+			return Optional.empty();
+		}
+		try {
+			long ts = Long.parseLong(fname, 0, fname.indexOf(".zip"), 10);
+			return Optional.of(Instant.ofEpochMilli(ts));
+		} catch (NumberFormatException nfe) {
+			return Optional.empty();
+		}
 	}
 
 }

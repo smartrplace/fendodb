@@ -22,6 +22,8 @@ import java.security.AccessControlException;
 import java.security.AccessController;
 import java.security.PrivilegedActionException;
 import java.security.PrivilegedExceptionAction;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -201,12 +203,24 @@ class SlotsDbStorage implements FendoTimeSeries {
 				@Override
 				public Void run() throws Exception {
 					lock.writeLock().lock();
+					long max_ts = Instant.now().plus(7, ChronoUnit.DAYS).toEpochMilli();
 					try {
 						if (configuration != null) {
 
 							for (SampledValue value : values) {
+								if (value == null) {
+									continue; // XXX how?
+								}
+								//XXX older SlotsDB versions would sometimes produce corrupted files on shutdown
+								if (value.getTimestamp() > max_ts) {
+									logger.error("bad timestamp ({}) in series {}", Instant.ofEpochMilli(value.getTimestamp()), recorder.getPath());
+									continue;
+								}
+								byte q = (byte) (value.getQuality() != null
+										? value.getQuality().getQuality()
+										: Quality.BAD.getQuality());
 								recorder.getProxy().appendValue(idEncoded, value.getValue().getDoubleValue(), value.getTimestamp(),
-										(byte) value.getQuality().getQuality(), configuration);
+										q, configuration);
 							}
 						}
 					} catch (IOException e) {
@@ -636,7 +650,7 @@ class SlotsDbStorage implements FendoTimeSeries {
 					lock.readLock().lock();
 					try {
 						return recorder.getProxy().readNextValue(idEncoded, time, configuration);
-					} catch (IOException e) {
+					} catch (IOException | RuntimeException e) {
 						logger.error("", e);
 						return null;
 					} finally {
