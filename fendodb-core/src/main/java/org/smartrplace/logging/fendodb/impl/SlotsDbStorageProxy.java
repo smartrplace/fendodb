@@ -232,7 +232,7 @@ class SlotsDbStorageProxy implements FendoTimeSeries {
 		return "SlotsDbStorageProxy[" + master.toString() + "]";
 	}
 	
-	@Override
+	//@Override
 	public boolean isReadOnly() {
 		return readOnly;
 	}
