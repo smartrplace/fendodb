@@ -82,11 +82,8 @@ public class FlexibleIntervalFileObject extends FileObject {
 
 	@Override
 	public void append(double value, long timestamp, byte flag) throws IOException {
-		// long writePosition = length;
-		if (!canWrite) {
-			enableOutput();
-		}
 		synchronized(this) {
+			enableOutput();
 			if (timestamp > lastTimestamp) {
 				ByteBuffer buf = ByteBuffer.allocate(17);
 				buf.putLong(timestamp);

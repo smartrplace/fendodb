@@ -129,11 +129,11 @@ public abstract class FileObject {
 		/*
 		 * enabling output
 		 */
-		if (canWrite) {
+		if (canWrite && channel != null && channel.isOpen()) {
 			return;
 		}
 		synchronized(this) {
-			if (canWrite) {
+			if (canWrite && channel != null && channel.isOpen()) {
 				return;
 			}
 			if (channel != null) {
